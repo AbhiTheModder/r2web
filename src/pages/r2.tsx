@@ -13,6 +13,7 @@ export default function Radare2Terminal() {
     const [wasmerInitialized, setWasmerInitialized] = useState(false);
     const [pkg, setPkg] = useState<Wasmer | null>(null);
     const [wasmUrl, setWasmUrl] = useState("https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0")
+    const [sidebarOpen, setSidebarOpen] = useState(true);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -51,7 +52,11 @@ export default function Radare2Terminal() {
     useEffect(() => {
         if (!wasmerInitialized || !pkg || !terminalRef.current) return;
 
-        const term = new Terminal({ cursorBlink: true, convertEol: true });
+        const term = new Terminal({
+            cursorBlink: true, convertEol: true, theme: {
+                background: "#1e1e1e"
+            }
+        });
         const fit = new FitAddon();
 
         term.loadAddon(fit);
@@ -162,7 +167,29 @@ export default function Radare2Terminal() {
         });
     }
 
-    return <div ref={terminalRef} style={{ height: "100vh", width: "100%" }} />;
+    return (
+        <div style={{ display: "grid", gridTemplateColumns: sidebarOpen ? "200px 1fr" : "0 1fr", height: "100vh", width: "100%", transition: "grid-template-columns 0.3s", backgroundColor: "#1e1e1e", borderRadius: "5px" }}>
+            {sidebarOpen && (
+                <div style={{ padding: "10px", overflow: "hidden", color: "#ffffff" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <h3>Options</h3>
+                        <button onClick={() => setSidebarOpen(false)}>×</button>
+                    </div>
+                    <ul style={{ listStyleType: "none", padding: 0 }}>
+                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", width: "100%", textAlign: "center" }}>Disassembly</button></li>
+                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Decompiler</button></li>
+                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Hexdump</button></li>
+                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Strings</button></li>
+                    </ul>
+                </div>
+            )}
+            {!sidebarOpen && (
+                <button onClick={() => setSidebarOpen(true)} style={{ position: "fixed", left: "10px", top: "10px", zIndex: 1000 }}>☰</button>
+            )}
+            <div ref={terminalRef} style={{ height: "100%", width: "100%" }} />
+        </div>
+    );
 }
+
 
 
