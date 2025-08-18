@@ -295,7 +295,7 @@ export default function Radare2Terminal() {
                     >
                         {downloadPhase === "initializing" && "Initializing Radare2..."}
                         {downloadPhase === "downloading" &&
-                            "Downloading Radare2 WebAssembly..."}
+                            "Downloading Radare2..."}
                         {downloadPhase === "processing" && "Processing..."}
                         {downloadPhase === "complete" && "Ready!"}
                     </h2>
@@ -364,7 +364,7 @@ export default function Radare2Terminal() {
                         }}
                     >
                         {downloadPhase === "initializing" &&
-                            "Setting up WebAssembly runtime..."}
+                            "Setting up runtime..."}
                         {downloadPhase === "downloading" &&
                             "Downloading radare2 (will not download again in future)..."}
                         {downloadPhase === "processing" &&
