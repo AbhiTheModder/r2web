@@ -297,7 +297,6 @@ const styles = {
     fileName: {
         color: "#28a745",
         fontWeight: "600",
-        marginBottom: "0.5rem",
         fontSize: "1rem",
     },
     fileSize: {
