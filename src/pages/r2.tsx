@@ -14,6 +14,7 @@ export default function Radare2Terminal() {
     const [pkg, setPkg] = useState<Wasmer | null>(null);
     const [wasmUrl, setWasmUrl] = useState("https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0")
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [r2Writer, setr2Writer] = useState<WritableStreamDefaultWriter<any> | undefined>(undefined);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -105,6 +106,7 @@ export default function Radare2Terminal() {
     function connectStreams(instance: Instance, term: Terminal) {
         const encoder = new TextEncoder();
         const stdin = instance.stdin?.getWriter();
+        setr2Writer(stdin);
 
         let cancelController: AbortController | null = null;
 
@@ -137,6 +139,7 @@ export default function Radare2Terminal() {
         const stdoutStream = new WritableStream({
             write: chunk => {
                 try {
+                    // console.log("stdout:", new TextDecoder().decode(chunk));
                     term.write(chunk);
                 } catch (error) {
                     console.error("Error writing to stdout:", error);
@@ -176,10 +179,34 @@ export default function Radare2Terminal() {
                         <button onClick={() => setSidebarOpen(false)}>×</button>
                     </div>
                     <ul style={{ listStyleType: "none", padding: 0 }}>
-                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", width: "100%", textAlign: "center" }}>Disassembly</button></li>
-                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Decompiler</button></li>
-                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Hexdump</button></li>
-                        <li><button style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Strings</button></li>
+                        <li><button onClick={() => {
+                            const encoder = new TextEncoder();
+                            r2Writer?.write(encoder.encode('?e "\\ec"'));
+                            r2Writer?.write(encoder.encode("\r"));
+                            r2Writer?.write(encoder.encode("pd"));
+                            r2Writer?.write(encoder.encode("\r"));
+                        }} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", width: "100%", textAlign: "center" }}>Disassembly</button></li>
+                        <li><button onClick={() => {
+                            const encoder = new TextEncoder();
+                            r2Writer?.write(encoder.encode('?e "\\ec"'));
+                            r2Writer?.write(encoder.encode("\r"));
+                            r2Writer?.write(encoder.encode("pdc"));
+                            r2Writer?.write(encoder.encode("\r"));
+                        }} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Decompiler</button></li>
+                        <li><button onClick={() => {
+                            const encoder = new TextEncoder();
+                            r2Writer?.write(encoder.encode('?e "\\ec"'));
+                            r2Writer?.write(encoder.encode("\r"));
+                            r2Writer?.write(encoder.encode("px"));
+                            r2Writer?.write(encoder.encode("\r"));
+                        }} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Hexdump</button></li>
+                        <li><button onClick={() => {
+                            const encoder = new TextEncoder();
+                            r2Writer?.write(encoder.encode('?e "\\ec"'));
+                            r2Writer?.write(encoder.encode("\r"));
+                            r2Writer?.write(encoder.encode("iz"));
+                            r2Writer?.write(encoder.encode("\r"));
+                        }} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Strings</button></li>
                     </ul>
                 </div>
             )}
