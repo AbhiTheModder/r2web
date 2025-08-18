@@ -12,16 +12,19 @@ export default function Radare2Terminal() {
     const [_, setFitAddon] = useState<FitAddon | null>(null);
     const [wasmerInitialized, setWasmerInitialized] = useState(false);
     const [pkg, setPkg] = useState<Wasmer | null>(null);
-    const wasmUrl = "https://radareorg.github.io/r2wasm/radare2.wasm?v=5.8.8";
+    const [wasmUrl, setWasmUrl] = useState("https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0")
 
     useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const version = urlParams.get('version') || '6.0.0';
+        setWasmUrl(`https://radareorg.github.io/r2wasm/radare2.wasm?v=${version}`);
         async function initializeWasmer() {
             const { Wasmer, init } = await import("@wasmer/sdk");
             await init({ module: wasmerSDKModule });
             setWasmerInitialized(true);
 
             const cache = await caches.open("wasm-cache");
-            const cachedResponse = await cache.match(wasmUrl);
+            const cachedResponse = await cache.match(version);
             if (cachedResponse) {
                 const buffer = await cachedResponse.arrayBuffer();
                 const packageInstance = Wasmer.fromWasm(new Uint8Array(buffer));
@@ -32,7 +35,7 @@ export default function Radare2Terminal() {
             const buffer = await response.arrayBuffer();
             const packageInstance = Wasmer.fromWasm(new Uint8Array(buffer));
             setPkg(packageInstance);
-            cache.put(wasmUrl, response.clone());
+            await cache.put(version, new Response(buffer));
             return;
         }
 
@@ -99,9 +102,6 @@ export default function Radare2Terminal() {
         const stdin = instance.stdin?.getWriter();
 
         let cancelController: AbortController | null = null;
-        let history: string[] = [];
-        let historyIndex = -1;
-        let currentInput = '';
 
         term.onData(data => {
             if (data === '\x03') { // Ctrl+C
@@ -112,37 +112,6 @@ export default function Radare2Terminal() {
                     stdin?.write(encoder.encode("\r"));
                 }
                 return;
-            }
-
-            if (data === '\r') { // Enter key
-                if (currentInput.trim() !== '') {
-                    history.push(currentInput);
-                    historyIndex = history.length;
-                }
-                currentInput = '';
-            } else if (data === '\x1b[A') { // Up arrow
-                if (historyIndex > 0) {
-                    historyIndex--;
-                    term.write('\x1b[2K\r' + history[historyIndex]);
-                    currentInput = history[historyIndex];
-                }
-            } else if (data === '\x1b[B') { // Down arrow
-                if (historyIndex < history.length - 1) {
-                    historyIndex++;
-                    term.write('\x1b[2K\r' + history[historyIndex]);
-                    currentInput = history[historyIndex];
-                } else if (historyIndex === history.length - 1) {
-                    historyIndex++;
-                    term.write('\x1b[2K\r');
-                    currentInput = '';
-                }
-            } else if (data === '\x7f') { // Backspace
-                if (currentInput.length > 0) {
-                    currentInput = currentInput.slice(0, -1);
-                    term.write('\x1b[D \x1b[D');
-                }
-            } else {
-                currentInput += data;
             }
 
             try {

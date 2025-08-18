@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { fileStore } from "../store/FileStore";
 import { useNavigate } from "react-router-dom";
 
@@ -22,6 +22,7 @@ export default function Home() {
     const [file, setFile] = useState<File | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [selectedVersion, setSelectedVersion] = useState("6.0.0");
     const navigate = useNavigate();
 
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,6 +30,27 @@ export default function Home() {
             setFile(e.target.files[0]);
         }
     };
+    const [r2Versions, setR2Versions] = useState([
+        { value: "6.0.0", label: "r2 6.0.0" },
+        { value: "5.8.8", label: "r2 5.8.8" },
+    ]);
+    useEffect(() => {
+        const fetchR2Versions = async () => {
+            try {
+                const response = await fetch('https://api.github.com/repos/radareorg/radare2/releases');
+                const data = await response.json();
+                const versions = data.map((release: { tag_name: any; }) => ({
+                    value: release.tag_name,
+                    label: `r2 ${release.tag_name}`,
+                }));
+                setR2Versions(versions);
+            } catch (error) {
+                console.error('Error fetching r2 versions:', error);
+            }
+        };
+
+        fetchR2Versions();
+    }, []);
 
     const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -59,7 +81,7 @@ export default function Home() {
                 name: file.name,
                 data: new Uint8Array(arrayBuffer),
             });
-            navigate("/r2");
+            navigate(`/r2?version=${selectedVersion}`);
         } catch (error) {
             console.error("Error processing file:", error);
         } finally {
@@ -85,6 +107,24 @@ export default function Home() {
                     <p style={styles.subtitle}>
                         Upload binary files for reverse engineering analysis
                     </p>
+
+                    <div style={styles.versionSelector}>
+                        <label htmlFor="version-select" style={styles.versionLabel}>
+                            Select Radare2 Version:
+                        </label>
+                        <select
+                            id="version-select"
+                            value={selectedVersion}
+                            onChange={(e) => setSelectedVersion(e.target.value)}
+                            style={styles.versionDropdown}
+                        >
+                            {r2Versions.map((version) => (
+                                <option key={version.value} value={version.value}>
+                                    {version.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     <div
                         onDragOver={onDragOver}
@@ -295,5 +335,27 @@ const styles = {
         textDecoration: "none",
         fontWeight: "600",
         transition: "color 0.2s ease",
+    },
+    versionSelector: {
+        marginBottom: "1.5rem",
+        width: "100%",
+    },
+    versionLabel: {
+        display: "block",
+        marginBottom: "0.5rem",
+        color: "#666",
+        fontSize: "0.9rem",
+        fontWeight: "500",
+    },
+    versionDropdown: {
+        width: "100%",
+        padding: "0.75rem",
+        borderRadius: "8px",
+        border: "1px solid #ddd",
+        fontSize: "1rem",
+        backgroundColor: "#fff",
+        color: "#333",
+        transition: "border-color 0.2s ease",
+        outline: "none",
     },
 };
