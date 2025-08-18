@@ -14,16 +14,25 @@ export default function Radare2Terminal() {
     const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
     const [wasmerInitialized, setWasmerInitialized] = useState(false);
     const [pkg, setPkg] = useState<Wasmer | null>(null);
-    const [wasmUrl, setWasmUrl] = useState("https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0")
+    const [wasmUrl, setWasmUrl] = useState(
+        "https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0"
+    );
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [r2Writer, setr2Writer] = useState<WritableStreamDefaultWriter<any> | undefined>(undefined);
+    const [r2Writer, setr2Writer] = useState<
+        WritableStreamDefaultWriter<any> | undefined
+    >(undefined);
     const [searchTerm, setSearchTerm] = useState("");
     const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
     const [searchRegex, setSearchRegex] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState(0);
+    const [downloadPhase, setDownloadPhase] = useState<
+        "initializing" | "downloading" | "processing" | "complete"
+    >("initializing");
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
-        const version = urlParams.get('version') || '6.0.0';
+        const version = urlParams.get("version") || "6.0.0";
         setWasmUrl(`https://radareorg.github.io/r2wasm/radare2.wasm?v=${version}`);
         async function initializeWasmer() {
             const { Wasmer, init } = await import("@wasmer/sdk");
@@ -38,12 +47,61 @@ export default function Radare2Terminal() {
                 setPkg(packageInstance);
                 return;
             }
+            setDownloadPhase("initializing");
+            setIsDownloading(true);
+            setDownloadProgress(10);
+
+            setDownloadPhase("downloading");
+            setDownloadProgress(30);
+
             const response = await fetch(wasmUrl);
-            const buffer = await response.arrayBuffer();
-            const packageInstance = Wasmer.fromWasm(new Uint8Array(buffer));
+
+            const contentLength = response.headers.get("content-length");
+            const total = contentLength ? parseInt(contentLength, 10) : 0;
+            let loaded = 0;
+
+            const reader = response.body?.getReader();
+            const chunks: Uint8Array[] = [];
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    chunks.push(value);
+                    loaded += value.length;
+
+                    if (total > 0) {
+                        const progress = Math.min(30 + (loaded / total) * 50, 80);
+                        setDownloadProgress(progress);
+                    }
+                }
+            }
+
+            setDownloadPhase("processing");
+            setDownloadProgress(85);
+
+            const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+            const buffer = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+                buffer.set(chunk, offset);
+                offset += chunk.length;
+            }
+
+            setDownloadProgress(90);
+
+            const packageInstance = Wasmer.fromWasm(buffer);
             setPkg(packageInstance);
+
+            setDownloadProgress(95);
+
             await cache.put(version, new Response(buffer));
-            return;
+
+            setDownloadProgress(100);
+            setDownloadPhase("complete");
+
+            setTimeout(() => setIsDownloading(false), 500);
         }
 
         initializeWasmer();
@@ -59,9 +117,12 @@ export default function Radare2Terminal() {
         if (!wasmerInitialized || !pkg || !terminalRef.current) return;
 
         const term = new Terminal({
-            cursorBlink: true, convertEol: true, scrollback: 90000, theme: {
-                background: "#1e1e1e"
-            }
+            cursorBlink: true,
+            convertEol: true,
+            scrollback: 90000,
+            theme: {
+                background: "#1e1e1e",
+            },
         });
         const fit = new FitAddon();
         const search = new SearchAddon();
@@ -92,9 +153,9 @@ export default function Radare2Terminal() {
                 return;
             }
 
-            termInstance!.write('\x1b[A');
-            termInstance!.write('\x1b[2K');
-            termInstance!.write('\r');
+            termInstance!.write("\x1b[A");
+            termInstance!.write("\x1b[2K");
+            termInstance!.write("\r");
 
             const instance = await pkg!.entrypoint!.run({
                 args: [file.name],
@@ -118,8 +179,9 @@ export default function Radare2Terminal() {
 
         let cancelController: AbortController | null = null;
 
-        term.onData(data => {
-            if (data === '\x03') { // Ctrl+C
+        term.onData((data) => {
+            if (data === "\x03") {
+                // Ctrl+C
                 if (cancelController) {
                     cancelController.abort();
                     cancelController = null;
@@ -143,9 +205,8 @@ export default function Radare2Terminal() {
             }
         });
 
-
         const stdoutStream = new WritableStream({
-            write: chunk => {
+            write: (chunk) => {
                 try {
                     // console.log("stdout:", new TextDecoder().decode(chunk));
                     term.write(chunk);
@@ -153,18 +214,18 @@ export default function Radare2Terminal() {
                     console.error("Error writing to stdout:", error);
                     term.write("\r\nError: Failed to write to stdout\r\n");
                 }
-            }
+            },
         });
 
         const stderrStream = new WritableStream({
-            write: chunk => {
+            write: (chunk) => {
                 try {
                     term.write(chunk);
                 } catch (error) {
                     console.error("Error writing to stderr:", error);
                     term.write("\r\nError: Failed to write to stderr\r\n");
                 }
-            }
+            },
         });
 
         instance.stdout.pipeTo(stdoutStream).catch((error: any) => {
@@ -200,87 +261,346 @@ export default function Radare2Terminal() {
     const isFileSelected = file !== null;
 
     return (
-        <div style={{ display: "grid", gridTemplateColumns: sidebarOpen ? "200px 1fr" : "0 1fr", minHeight: "100vh", width: "100%", transition: "grid-template-columns 0.3s", backgroundColor: "#1e1e1e", borderRadius: "5px" }}>
-            {sidebarOpen && (
-                <div style={{ padding: "10px", overflow: "hidden", color: "#ffffff" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <h3>Options</h3>
-                        <button style={{ backgroundColor: "#2d2d2d", color: "#ffffff" }} onClick={() => setSidebarOpen(false)}>×</button>
-                    </div>
-                    <ul style={{ listStyleType: "none", padding: 0 }}>
-                        <li><button onClick={() => {
-                            if (!isFileSelected) return;
-                            const encoder = new TextEncoder();
-                            r2Writer?.write(encoder.encode('?e "\\ec"'));
-                            r2Writer?.write(encoder.encode("\r"));
-                            r2Writer?.write(encoder.encode("pd"));
-                            r2Writer?.write(encoder.encode("\r"));
-                        }} disabled={!isFileSelected} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", width: "100%", textAlign: "center" }}>Disassembly</button></li>
-                        <li><button onClick={() => {
-                            if (!isFileSelected) return;
-                            const encoder = new TextEncoder();
-                            r2Writer?.write(encoder.encode('?e "\\ec"'));
-                            r2Writer?.write(encoder.encode("\r"));
-                            r2Writer?.write(encoder.encode("pdc"));
-                            r2Writer?.write(encoder.encode("\r"));
-                        }} disabled={!isFileSelected} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Decompiler</button></li>
-                        <li><button onClick={() => {
-                            if (!isFileSelected) return;
-                            const encoder = new TextEncoder();
-                            r2Writer?.write(encoder.encode('?e "\\ec"'));
-                            r2Writer?.write(encoder.encode("\r"));
-                            r2Writer?.write(encoder.encode("px"));
-                            r2Writer?.write(encoder.encode("\r"));
-                        }} disabled={!isFileSelected} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Hexdump</button></li>
-                        <li><button onClick={() => {
-                            if (!isFileSelected) return;
-                            const encoder = new TextEncoder();
-                            r2Writer?.write(encoder.encode('?e "\\ec"'));
-                            r2Writer?.write(encoder.encode("\r"));
-                            r2Writer?.write(encoder.encode("iz"));
-                            r2Writer?.write(encoder.encode("\r"));
-                        }} disabled={!isFileSelected} style={{ padding: "5px 5px 5px 5px", backgroundColor: "#2d2d2d", color: "#ffffff", marginTop: "10px", width: "100%", textAlign: "center" }}>Strings</button></li>
-                        <li style={{ marginTop: "10px" }}>
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search..."
-                                style={{ padding: "5px", backgroundColor: "#2d2d2d", color: "#ffffff", width: "100%", border: "none" }}
+        <>
+            {isDownloading && (
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        minHeight: "100vh",
+                        backgroundColor: "#1e1e1e",
+                        color: "#ffffff",
+                        fontFamily: "system-ui, -apple-system, sans-serif",
+                    }}
+                >
+                    <img
+                        src="/r2.png"
+                        alt="Radare2 Logo"
+                        style={{
+                            width: "80px",
+                            height: "80px",
+                            marginBottom: "30px",
+                            animation: "pulse 2s infinite",
+                        }}
+                    />
+
+                    <h2
+                        style={{
+                            marginBottom: "30px",
+                            fontSize: "24px",
+                            fontWeight: "300",
+                        }}
+                    >
+                        {downloadPhase === "initializing" && "Initializing Radare2..."}
+                        {downloadPhase === "downloading" &&
+                            "Downloading Radare2 WebAssembly..."}
+                        {downloadPhase === "processing" && "Processing..."}
+                        {downloadPhase === "complete" && "Ready!"}
+                    </h2>
+
+                    <div
+                        style={{
+                            width: "400px",
+                            maxWidth: "80vw",
+                            backgroundColor: "#2d2d2d",
+                            borderRadius: "12px",
+                            padding: "8px",
+                            marginBottom: "20px",
+                            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: `${downloadProgress}%`,
+                                height: "8px",
+                                backgroundColor:
+                                    downloadPhase === "complete" ? "#27ae60" : "#3498db",
+                                borderRadius: "6px",
+                                transition: "all 0.3s ease",
+                                background:
+                                    downloadPhase === "complete"
+                                        ? "linear-gradient(90deg, #27ae60, #2ecc71)"
+                                        : "linear-gradient(90deg, #3498db, #5dade2)",
+                                position: "relative",
+                                overflow: "hidden",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: "-100%",
+                                    width: "100%",
+                                    height: "100%",
+                                    background:
+                                        "linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)",
+                                    animation:
+                                        downloadPhase !== "complete"
+                                            ? "shimmer 2s infinite"
+                                            : "none",
+                                }}
                             />
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "5px" }}>
-                                <label style={{ display: "flex", alignItems: "center" }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={searchCaseSensitive}
-                                        onChange={() => setSearchCaseSensitive(!searchCaseSensitive)}
-                                        style={{ marginRight: "5px" }}
-                                    />
-                                    Case Sensitive
-                                </label>
-                                <label style={{ display: "flex", alignItems: "center" }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={searchRegex}
-                                        onChange={() => setSearchRegex(!searchRegex)}
-                                        style={{ marginRight: "5px" }}
-                                    />
-                                    Regex
-                                </label>
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "5px" }}>
-                                <button onClick={handleSearch} style={{ padding: "5px", backgroundColor: "#2d2d2d", color: "#ffffff", width: "48%" }}>Next</button>
-                                <button onClick={handleSearchPrevious} style={{ padding: "5px", backgroundColor: "#2d2d2d", color: "#ffffff", width: "48%" }}>Previous</button>
-                            </div>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
+
+                    <p
+                        style={{
+                            fontSize: "16px",
+                            color: "#bbb",
+                            marginBottom: "10px",
+                        }}
+                    >
+                        {Math.round(downloadProgress)}%
+                    </p>
+
+                    <p
+                        style={{
+                            fontSize: "14px",
+                            color: "#888",
+                            textAlign: "center",
+                            maxWidth: "400px",
+                        }}
+                    >
+                        {downloadPhase === "initializing" &&
+                            "Setting up WebAssembly runtime..."}
+                        {downloadPhase === "downloading" &&
+                            "Downloading radare2 (will not download again in future)..."}
+                        {downloadPhase === "processing" &&
+                            "Initializing radare2 instance..."}
+                        {downloadPhase === "complete" && "Radare2 is ready to use!"}
+                    </p>
+
+                    <style>{`
+                    @keyframes pulse {
+                        0% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.05); opacity: 0.8; }
+                        100% { transform: scale(1); opacity: 1; }
+                    }
+                    
+                    @keyframes shimmer {
+                        0% { left: -100%; }
+                        100% { left: 100%; }
+                    }
+                `}</style>
                 </div>
             )}
-            {!sidebarOpen && (
-                <button onClick={() => setSidebarOpen(true)} style={{ position: "fixed", left: "10px", top: "10px", zIndex: 1000, backgroundColor: "#2d2d2d", color: "#ffffff" }}>☰</button>
-            )}
-            <div ref={terminalRef} style={{ minHeight: "100vh", width: "100%" }} />
-        </div>
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: sidebarOpen ? "200px 1fr" : "0 1fr",
+                    minHeight: "100vh",
+                    width: "100%",
+                    transition: "grid-template-columns 0.3s",
+                    backgroundColor: "#1e1e1e",
+                    borderRadius: "5px",
+                }}
+            >
+                {sidebarOpen && (
+                    <div
+                        style={{ padding: "10px", overflow: "hidden", color: "#ffffff" }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                            }}
+                        >
+                            <h3>Options</h3>
+                            <button
+                                style={{ backgroundColor: "#2d2d2d", color: "#ffffff" }}
+                                onClick={() => setSidebarOpen(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <ul style={{ listStyleType: "none", padding: 0 }}>
+                            <li>
+                                <button
+                                    onClick={() => {
+                                        if (!isFileSelected) return;
+                                        const encoder = new TextEncoder();
+                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                        r2Writer?.write(encoder.encode("pd"));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                    }}
+                                    disabled={!isFileSelected}
+                                    style={{
+                                        padding: "5px 5px 5px 5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        width: "100%",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    Disassembly
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => {
+                                        if (!isFileSelected) return;
+                                        const encoder = new TextEncoder();
+                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                        r2Writer?.write(encoder.encode("pdc"));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                    }}
+                                    disabled={!isFileSelected}
+                                    style={{
+                                        padding: "5px 5px 5px 5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        marginTop: "10px",
+                                        width: "100%",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    Decompiler
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => {
+                                        if (!isFileSelected) return;
+                                        const encoder = new TextEncoder();
+                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                        r2Writer?.write(encoder.encode("px"));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                    }}
+                                    disabled={!isFileSelected}
+                                    style={{
+                                        padding: "5px 5px 5px 5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        marginTop: "10px",
+                                        width: "100%",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    Hexdump
+                                </button>
+                            </li>
+                            <li>
+                                <button
+                                    onClick={() => {
+                                        if (!isFileSelected) return;
+                                        const encoder = new TextEncoder();
+                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                        r2Writer?.write(encoder.encode("iz"));
+                                        r2Writer?.write(encoder.encode("\r"));
+                                    }}
+                                    disabled={!isFileSelected}
+                                    style={{
+                                        padding: "5px 5px 5px 5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        marginTop: "10px",
+                                        width: "100%",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    Strings
+                                </button>
+                            </li>
+                            <li style={{ marginTop: "10px" }}>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search..."
+                                    style={{
+                                        padding: "5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        width: "100%",
+                                        border: "none",
+                                    }}
+                                />
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        marginTop: "5px",
+                                    }}
+                                >
+                                    <label style={{ display: "flex", alignItems: "center" }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={searchCaseSensitive}
+                                            onChange={() =>
+                                                setSearchCaseSensitive(!searchCaseSensitive)
+                                            }
+                                            style={{ marginRight: "5px" }}
+                                        />
+                                        Case Sensitive
+                                    </label>
+                                    <label style={{ display: "flex", alignItems: "center" }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={searchRegex}
+                                            onChange={() => setSearchRegex(!searchRegex)}
+                                            style={{ marginRight: "5px" }}
+                                        />
+                                        Regex
+                                    </label>
+                                </div>
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        marginTop: "5px",
+                                    }}
+                                >
+                                    <button
+                                        onClick={handleSearch}
+                                        style={{
+                                            padding: "5px",
+                                            backgroundColor: "#2d2d2d",
+                                            color: "#ffffff",
+                                            width: "48%",
+                                        }}
+                                    >
+                                        Next
+                                    </button>
+                                    <button
+                                        onClick={handleSearchPrevious}
+                                        style={{
+                                            padding: "5px",
+                                            backgroundColor: "#2d2d2d",
+                                            color: "#ffffff",
+                                            width: "48%",
+                                        }}
+                                    >
+                                        Previous
+                                    </button>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                )}
+                {!sidebarOpen && (
+                    <button
+                        onClick={() => setSidebarOpen(true)}
+                        style={{
+                            position: "fixed",
+                            left: "10px",
+                            top: "10px",
+                            zIndex: 1000,
+                            backgroundColor: "#2d2d2d",
+                            color: "#ffffff",
+                        }}
+                    >
+                        ☰
+                    </button>
+                )}
+                <div ref={terminalRef} style={{ minHeight: "100vh", width: "100%" }} />
+            </div>
+        </>
     );
 }
-
