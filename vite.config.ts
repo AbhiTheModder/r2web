@@ -12,5 +12,14 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@wasmer/sdk']
-  }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+  entryFileNames: 'index.mjs',
+  chunkFileNames: '[name].js',
+  assetFileNames: '[name].[ext]',
+},
+    },
+  },
 })
