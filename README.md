@@ -4,6 +4,11 @@
 ## r2web: __Access radare2 from anywhere, anytime.__
 
 
+
+https://github.com/user-attachments/assets/1d60bc1a-2e91-4868-ac5f-3a861d0af537
+
+
+
 ## Overview
 
 r2web lets you run radare2 without local installs or platform hassles. Analyze files directly in your browser. It runs entirely client-side using radare2 WASI and Wasmer, with an [xterm.js](https://xtermjs.org/) frontend for interactive command execution.
