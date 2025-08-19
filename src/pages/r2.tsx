@@ -54,7 +54,14 @@ export default function Radare2Terminal() {
             setDownloadPhase("downloading");
             setDownloadProgress(30);
 
-            const response = await fetch(wasmUrl);
+            let response: Response;
+            try {
+                response = await fetch(wasmUrl);
+            } catch (e) {
+                console.error(e);
+                setIsDownloading(false);
+                return;
+            }
 
             const contentLength = response.headers.get("content-length");
             const total = contentLength ? parseInt(contentLength, 10) : 0;
