@@ -13,6 +13,8 @@ https://github.com/user-attachments/assets/1d60bc1a-2e91-4868-ac5f-3a861d0af537
 
 r2web lets you run radare2 without local installs or platform hassles. Analyze files directly in your browser. It runs entirely client-side using radare2 WASI and Wasmer, with an [xterm.js](https://xtermjs.org/) frontend for interactive command execution.
 
+👉 [Try it live](https://r2.revengi.in)
+
 ## Features
 
 - **Browser-based**: No local installation required
@@ -41,6 +43,8 @@ cd r2web
 bun install
 bun dev
 ```
+
+Or skip the setup and [try it live](https://r2.revengi.in).
 
 > [!TIP]
 > If you don't have bun installed, you can use npm or yarn or any other package manager which you have installed. Just replace `bun` with `npm` or `yarn` (or any other package manager) in the above commands.
