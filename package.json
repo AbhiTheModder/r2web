@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "cp node_modules/coi-serviceworker/coi-serviceworker.min.js public/"
   },
   "dependencies": {
     "@wasmer/sdk": "^0.9.0",
     "@xterm/addon-search": "^0.15.0",
+    "coi-serviceworker": "^0.1.7",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router": "^7.8.1",
