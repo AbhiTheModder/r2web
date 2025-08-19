@@ -6,7 +6,7 @@
 
 ## Overview
 
-r2web lets you run radare2 without local installs or platform hassles. Analyze files directly in your browser. It runs entirely client-side using WASIX and Wasmer, with an xterm.js frontend for interactive command execution.
+r2web lets you run radare2 without local installs or platform hassles. Analyze files directly in your browser. It runs entirely client-side using radare2 WASI and Wasmer, with an [xterm.js](https://xtermjs.org/) frontend for interactive command execution.
 
 ## Features
 
@@ -23,7 +23,7 @@ r2web lets you run radare2 without local installs or platform hassles. Analyze f
 r2web uses:
 
 *   React+TypeScript+Vite
-*   xterm.js for the terminal interface
+*   [xterm.js](https://xtermjs.org/) for the terminal interface
 *   Wasmer for running WASM
 *   r2wasm for the WASM build of radare2
 
@@ -46,6 +46,15 @@ bun dev
 - The radare2 binary is downloaded on first load and cached for future use.
 - No history support.
 - Currently there's no way to save modified files, (seems like an issue on r2wasm side), figuring out a way to fix it.
+
+
+## Contributing
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+- radare license can be found [here](https://github.com/radareorg/radare2/blob/master/COPYING.md).
 
 ## Similar Projects
 
