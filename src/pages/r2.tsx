@@ -180,12 +180,22 @@ export default function Radare2Terminal() {
         let cancelController: AbortController | null = null;
 
         term.onData((data) => {
+            // Ctrl+C
             if (data === "\x03") {
-                // Ctrl+C
                 if (cancelController) {
                     cancelController.abort();
                     cancelController = null;
                     term.write("^C\r");
+                    stdin?.write(encoder.encode("\r"));
+                }
+                return;
+            }
+
+            // CTRL+G
+            if (data === "\x07" || data === "G") {
+                const address = prompt("Enter address:");
+                if (address) {
+                    stdin?.write(encoder.encode(`s ${address}`));
                     stdin?.write(encoder.encode("\r"));
                 }
                 return;
@@ -294,8 +304,7 @@ export default function Radare2Terminal() {
                         }}
                     >
                         {downloadPhase === "initializing" && "Initializing Radare2..."}
-                        {downloadPhase === "downloading" &&
-                            "Downloading Radare2..."}
+                        {downloadPhase === "downloading" && "Downloading Radare2..."}
                         {downloadPhase === "processing" && "Processing..."}
                         {downloadPhase === "complete" && "Ready!"}
                     </h2>
@@ -363,8 +372,7 @@ export default function Radare2Terminal() {
                             maxWidth: "400px",
                         }}
                     >
-                        {downloadPhase === "initializing" &&
-                            "Setting up runtime..."}
+                        {downloadPhase === "initializing" && "Setting up runtime..."}
                         {downloadPhase === "downloading" &&
                             "Downloading radare2 (will not download again in future)..."}
                         {downloadPhase === "processing" &&
