@@ -5,7 +5,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { fileStore } from "../store/FileStore";
 import wasmerSDKModule from "@wasmer/sdk/wasm?url";
 import "xterm/css/xterm.css";
-import type { Instance, Wasmer } from "@wasmer/sdk";
+import { Directory, type Instance, type Wasmer } from "@wasmer/sdk";
 
 export default function Radare2Terminal() {
     const terminalRef = useRef<HTMLDivElement>(null);
@@ -31,6 +31,7 @@ export default function Radare2Terminal() {
     >("initializing");
     const [cachedVersions, setCachedVersions] = useState<string[]>([]);
     const [showCachedVersions, setShowCachedVersions] = useState(false);
+    const [dir, setDir] = useState<Directory | null>(null);
     async function fetchCachedVersions() {
         const cache = await caches.open("wasm-cache");
         const keys = await cache.keys();
@@ -38,6 +39,18 @@ export default function Radare2Terminal() {
         setCachedVersions(keys.map((request) => new URL(request.url).pathname.replace("/", "")));
     }
     fetchCachedVersions();
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, dir: Directory) => {
+        if (!event.target.files) return;
+
+        const files = Array.from(event.target.files);
+        await Promise.all(
+            files.map(async (file) => {
+                const arrayBuffer = await file.arrayBuffer();
+                await dir.writeFile(`/${file.name}`, new Uint8Array(arrayBuffer));
+                console.log(`File ${file.name} uploaded to /${file.name}`);
+            })
+        );
+    };
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -176,12 +189,16 @@ export default function Radare2Terminal() {
             termInstance!.write("\x1b[2K");
             termInstance!.write("\r");
 
+            const mydir = new Directory();
+            setDir(mydir);
+
             const instance = await pkg!.entrypoint!.run({
                 args: [file.name],
                 mount: {
                     ["./"]: {
                         [file.name]: file.data,
                     },
+                    mydir
                 },
             });
 
@@ -668,6 +685,32 @@ export default function Radare2Terminal() {
                                     )}
                                 </li>
                             )}
+                            <li style={{ marginTop: "10px" }}>
+                                <label
+                                    htmlFor="file-upload"
+                                    style={{
+                                        padding: "5px 5px 5px 5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        width: "100%",
+                                        textAlign: "center",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    Upload Files
+                                </label>
+                                <input
+                                    id="file-upload"
+                                    type="file"
+                                    multiple
+                                    onChange={(event) => {
+                                        if (dir) {
+                                            handleFileUpload(event, dir);
+                                        }
+                                    }}
+                                    style={{ display: "none" }}
+                                />
+                            </li>
                         </ul>
                     </div>
                 )}

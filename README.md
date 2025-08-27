@@ -52,7 +52,7 @@ Or skip the setup and [try it live](https://r2.revengi.in).
 ## Notes
 
 - This is a work in progress. Expect bugs and missing features.
-- The radare2 binary is downloaded on first load and cached for future use.
+- The radare2 binary is downloaded on first load and cached for future use (an option to disable caching is also given).
 - No history support.
 - Currently there's no way to save modified files, (seems like an issue on r2wasm side), figuring out a way to fix it.
 
