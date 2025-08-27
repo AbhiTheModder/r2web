@@ -23,6 +23,7 @@ export default function Home() {
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [selectedVersion, setSelectedVersion] = useState("6.0.0");
+    const [cacheVersion, setCacheVersion] = useState(false);
     const navigate = useNavigate();
 
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,7 +82,7 @@ export default function Home() {
                 name: file.name,
                 data: new Uint8Array(arrayBuffer),
             });
-            navigate(`/r2?version=${selectedVersion}`);
+            navigate(`/r2?version=${selectedVersion}&cache=${cacheVersion}`);
         } catch (error) {
             console.error("Error processing file:", error);
         } finally {
@@ -124,6 +125,15 @@ export default function Home() {
                                 </option>
                             ))}
                         </select>
+                        <label style={styles.cacheLabel}>
+                            <input
+                                type="checkbox"
+                                checked={cacheVersion}
+                                onChange={() => setCacheVersion(!cacheVersion)}
+                                style={styles.cacheCheckbox}
+                            />
+                            Cache this version
+                        </label>
                     </div>
 
                     <div
@@ -356,5 +366,15 @@ const styles = {
         color: "#333",
         transition: "border-color 0.2s ease",
         outline: "none",
+    },
+    cacheLabel: {
+        display: "flex",
+        alignItems: "center",
+        marginTop: "0.5rem",
+        color: "#666",
+        fontSize: "0.9rem",
+    },
+    cacheCheckbox: {
+        marginRight: "0.5rem",
     },
 };

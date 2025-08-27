@@ -33,6 +33,7 @@ export default function Radare2Terminal() {
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const version = urlParams.get("version") || "6.0.0";
+        const doCache = urlParams.get("cache") === "true";
         setWasmUrl(`https://radareorg.github.io/r2wasm/radare2.wasm?v=${version}`);
         async function initializeWasmer() {
             const { Wasmer, init } = await import("@wasmer/sdk");
@@ -103,7 +104,9 @@ export default function Radare2Terminal() {
 
             setDownloadProgress(95);
 
-            await cache.put(version, new Response(buffer));
+            if (doCache) {
+                await cache.put(version, new Response(buffer));
+            }
 
             setDownloadProgress(100);
             setDownloadPhase("complete");
