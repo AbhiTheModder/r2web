@@ -29,6 +29,15 @@ export default function Radare2Terminal() {
     const [downloadPhase, setDownloadPhase] = useState<
         "initializing" | "downloading" | "processing" | "complete"
     >("initializing");
+    const [cachedVersions, setCachedVersions] = useState<string[]>([]);
+    const [showCachedVersions, setShowCachedVersions] = useState(false);
+    async function fetchCachedVersions() {
+        const cache = await caches.open("wasm-cache");
+        const keys = await cache.keys();
+        // console.log("Cached versions:", keys);
+        setCachedVersions(keys.map((request) => new URL(request.url).pathname.replace("/", "")));
+    }
+    fetchCachedVersions();
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -536,7 +545,7 @@ export default function Radare2Terminal() {
                                         padding: "5px",
                                         backgroundColor: "#2d2d2d",
                                         color: "#ffffff",
-                                        width: "100%",
+                                        width: "95%",
                                         border: "none",
                                     }}
                                 />
@@ -599,6 +608,66 @@ export default function Radare2Terminal() {
                                     </button>
                                 </div>
                             </li>
+                            {cachedVersions.length > 0 && (
+                                <li style={{ marginTop: "10px" }}>
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <span>Cached Versions:</span>
+                                        <button
+                                            onClick={() => setShowCachedVersions(!showCachedVersions)}
+                                            style={{
+                                                padding: "5px",
+                                                backgroundColor: "#2d2d2d",
+                                                color: "#ffffff",
+                                            }}
+                                        >
+                                            {showCachedVersions ? "Hide" : "Show"}
+                                        </button>
+                                    </div>
+                                    {showCachedVersions && (
+                                        <ul style={{ listStyleType: "none", padding: 0 }}>
+                                            {cachedVersions.map((version, index) => (
+                                                <li key={index} style={{ marginTop: "5px", display: "flex", justifyContent: "space-between" }}>
+                                                    <button
+                                                        style={{
+                                                            padding: "5px",
+                                                            backgroundColor: "#2d2d2d",
+                                                            color: "#ffffff",
+                                                            width: "calc(100% - 30px)",
+                                                            textAlign: "center",
+                                                        }}
+                                                    >
+                                                        {version}
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            const cache = await caches.open("wasm-cache");
+                                                            await cache.delete(`/${version}`);
+                                                            fetchCachedVersions();
+                                                        }}
+                                                        style={{
+                                                            padding: "5px",
+                                                            backgroundColor: "#a10a0aff",
+                                                            color: "#ffffff",
+                                                            display: "flex",
+                                                            justifyContent: "center",
+                                                            alignItems: "center",
+                                                            marginLeft: "5px",
+                                                        }}
+                                                    >
+                                                        X
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </li>
+                            )}
                         </ul>
                     </div>
                 )}
