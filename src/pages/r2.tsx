@@ -200,6 +200,7 @@ export default function Radare2Terminal() {
                     ["./"]: {
                         [file.name]: file.data,
                     },
+                    mydir
                 },
             });
 
@@ -328,6 +329,7 @@ export default function Radare2Terminal() {
                 ["./"]: {
                     [file.name]: file.data,
                 },
+                mydir
             },
         });
 
