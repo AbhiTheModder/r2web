@@ -9,6 +9,7 @@ import { Directory, type Instance, type Wasmer } from "@wasmer/sdk";
 
 export default function Radare2Terminal() {
     const terminalRef = useRef<HTMLDivElement>(null);
+    const onDataDisposableRef = useRef<any>(null);
     const [termInstance, setTermInstance] = useState<Terminal | null>(null);
     const [_, setFitAddon] = useState<FitAddon | null>(null);
     const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
@@ -32,6 +33,8 @@ export default function Radare2Terminal() {
     const [cachedVersions, setCachedVersions] = useState<string[]>([]);
     const [showCachedVersions, setShowCachedVersions] = useState(false);
     const [dir, setDir] = useState<Directory | null>(null);
+    const [instance, setInstance] = useState<Instance | null>(null);
+
     async function fetchCachedVersions() {
         const cache = await caches.open("wasm-cache");
         const keys = await cache.keys();
@@ -185,6 +188,8 @@ export default function Radare2Terminal() {
                 return;
             }
 
+            onDataDisposableRef.current?.dispose();
+
             termInstance!.write("\x1b[A");
             termInstance!.write("\x1b[2K");
             termInstance!.write("\r");
@@ -198,9 +203,11 @@ export default function Radare2Terminal() {
                     ["./"]: {
                         [file.name]: file.data,
                     },
-                    mydir
+                    mydir,
                 },
             });
+
+            setInstance(instance);
 
             connectStreams(instance, termInstance!);
         }
@@ -215,7 +222,9 @@ export default function Radare2Terminal() {
 
         let cancelController: AbortController | null = null;
 
-        term.onData((data) => {
+        onDataDisposableRef.current?.dispose();
+
+        onDataDisposableRef.current = term.onData((data) => {
             // Ctrl+C
             if (data === "\x03") {
                 if (cancelController) {
@@ -284,6 +293,47 @@ export default function Radare2Terminal() {
             term.write("\r\nError: Failed to pipe stderr\r\n");
         });
     }
+
+    // Restart the current session by spawning a new Wasm instance running the same binary
+    const restartSession = async () => {
+        if (!pkg || !termInstance) return;
+        const file = fileStore.getFile();
+        if (!file) {
+            termInstance!.writeln("Error: No file provided");
+            return;
+        }
+
+        termInstance!.write("\x1b[A");
+        termInstance!.write("\x1b[2K");
+        termInstance!.write("\r");
+        termInstance!.writeln("Restarting session...");
+
+        // Close previous stdin writer if available to help terminate previous process streams
+        try {
+            await r2Writer?.close?.();
+        } catch (_) { }
+
+        // Free previous instance
+        try {
+            instance?.free();
+        } catch (_) { }
+
+        const mydir = new Directory();
+        setDir(mydir);
+
+        const newInstance = await pkg.entrypoint!.run({
+            args: [file.name],
+            mount: {
+                ["./"]: {
+                    [file.name]: file.data,
+                },
+                mydir,
+            },
+        });
+
+        setInstance(newInstance);
+        connectStreams(newInstance, termInstance);
+    };
 
     const handleSearch = () => {
         if (!searchAddon || !searchTerm) return;
@@ -461,6 +511,21 @@ export default function Radare2Terminal() {
                             </button>
                         </div>
                         <ul style={{ listStyleType: "none", padding: 0 }}>
+                            <li style={{ marginBottom: "8px" }}>
+                                <button
+                                    onClick={restartSession}
+                                    disabled={!isFileSelected || !pkg}
+                                    style={{
+                                        padding: "6px 5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        width: "100%",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    Restart Session
+                                </button>
+                            </li>
                             <li>
                                 <button
                                     onClick={() => {
@@ -649,7 +714,14 @@ export default function Radare2Terminal() {
                                     {showCachedVersions && (
                                         <ul style={{ listStyleType: "none", padding: 0 }}>
                                             {cachedVersions.map((version, index) => (
-                                                <li key={index} style={{ marginTop: "5px", display: "flex", justifyContent: "space-between" }}>
+                                                <li
+                                                    key={index}
+                                                    style={{
+                                                        marginTop: "5px",
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                    }}
+                                                >
                                                     <button
                                                         style={{
                                                             padding: "5px",
