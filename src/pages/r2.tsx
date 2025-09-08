@@ -9,6 +9,7 @@ import { Directory, type Instance, type Wasmer } from "@wasmer/sdk";
 
 export default function Radare2Terminal() {
     const terminalRef = useRef<HTMLDivElement>(null);
+    const onDataDisposableRef = useRef<any>(null);
     const [termInstance, setTermInstance] = useState<Terminal | null>(null);
     const [_, setFitAddon] = useState<FitAddon | null>(null);
     const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
@@ -187,6 +188,8 @@ export default function Radare2Terminal() {
                 return;
             }
 
+            onDataDisposableRef.current?.dispose();
+
             termInstance!.write("\x1b[A");
             termInstance!.write("\x1b[2K");
             termInstance!.write("\r");
@@ -200,7 +203,7 @@ export default function Radare2Terminal() {
                     ["./"]: {
                         [file.name]: file.data,
                     },
-                    mydir
+                    mydir,
                 },
             });
 
@@ -219,7 +222,9 @@ export default function Radare2Terminal() {
 
         let cancelController: AbortController | null = null;
 
-        term.onData((data) => {
+        onDataDisposableRef.current?.dispose();
+
+        onDataDisposableRef.current = term.onData((data) => {
             // Ctrl+C
             if (data === "\x03") {
                 if (cancelController) {
@@ -306,19 +311,12 @@ export default function Radare2Terminal() {
         // Close previous stdin writer if available to help terminate previous process streams
         try {
             await r2Writer?.close?.();
-        } catch (e) {
-            // ignore
-        }
+        } catch (_) { }
 
-        // Attempt to close previous instance streams if possible
+        // Free previous instance
         try {
-            if (instance?.stdin) {
-                const w = instance.stdin.getWriter?.();
-                try { w?.close?.(); } catch {}
-            }
-        } catch (e) {
-            // ignore
-        }
+            instance?.free();
+        } catch (_) { }
 
         const mydir = new Directory();
         setDir(mydir);
@@ -329,7 +327,7 @@ export default function Radare2Terminal() {
                 ["./"]: {
                     [file.name]: file.data,
                 },
-                mydir
+                mydir,
             },
         });
 
@@ -716,7 +714,14 @@ export default function Radare2Terminal() {
                                     {showCachedVersions && (
                                         <ul style={{ listStyleType: "none", padding: 0 }}>
                                             {cachedVersions.map((version, index) => (
-                                                <li key={index} style={{ marginTop: "5px", display: "flex", justifyContent: "space-between" }}>
+                                                <li
+                                                    key={index}
+                                                    style={{
+                                                        marginTop: "5px",
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                    }}
+                                                >
                                                     <button
                                                         style={{
                                                             padding: "5px",
