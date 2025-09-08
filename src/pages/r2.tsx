@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle, createRef } from "react";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -7,20 +7,201 @@ import wasmerSDKModule from "@wasmer/sdk/wasm?url";
 import "xterm/css/xterm.css";
 import { Directory, type Instance, type Wasmer } from "@wasmer/sdk";
 
-export default function Radare2Terminal() {
+type R2TabHandle = {
+    focus: () => void;
+    dispose: () => void;
+    uploadFiles: (files: FileList) => Promise<void>;
+    getWriter: () => WritableStreamDefaultWriter<any> | undefined;
+    getSearchAddon: () => SearchAddon | null;
+    getDir: () => Directory | null;
+};
+
+type R2TabProps = {
+    pkg: Wasmer | null;
+    file: { name: string; data: Uint8Array } | null;
+    active: boolean;
+};
+
+function connectStreams(
+    instance: Instance,
+    term: Terminal,
+    onWriter?: (w: WritableStreamDefaultWriter<any> | undefined) => void,
+) {
+    const encoder = new TextEncoder();
+    const stdin = instance.stdin?.getWriter();
+    if (onWriter) onWriter(stdin);
+
+    let cancelController: AbortController | null = null;
+
+    term.onData((data) => {
+        // Ctrl+C
+        if (data === "\x03") {
+            if (cancelController) {
+                cancelController.abort();
+                cancelController = null;
+                term.write("^C\r");
+                stdin?.write(encoder.encode("\r"));
+            }
+            return;
+        }
+
+        // CTRL+G
+        if (data === "\x07" || data === "G") {
+            const address = prompt("Enter address:");
+            if (address) {
+                stdin?.write(encoder.encode(`s ${address}`));
+                stdin?.write(encoder.encode("\r"));
+            }
+            return;
+        }
+
+        try {
+            if (cancelController) {
+                cancelController.abort();
+                cancelController = null;
+            }
+
+            cancelController = new AbortController();
+            stdin?.write(encoder.encode(data));
+        } catch (error) {
+            console.error("Error writing to stdin:", error);
+            term.write("\r\nError: Failed to write to stdin\r\n");
+        }
+    });
+
+    const stdoutStream = new WritableStream({
+        write: (chunk) => {
+            try {
+                term.write(chunk);
+            } catch (error) {
+                console.error("Error writing to stdout:", error);
+                term.write("\r\nError: Failed to write to stdout\r\n");
+            }
+        },
+    });
+
+    const stderrStream = new WritableStream({
+        write: (chunk) => {
+            try {
+                term.write(chunk);
+            } catch (error) {
+                console.error("Error writing to stderr:", error);
+                term.write("\r\nError: Failed to write to stderr\r\n");
+            }
+        },
+    });
+
+    instance.stdout.pipeTo(stdoutStream).catch((error: any) => {
+        console.error("Error piping stdout:", error);
+        term.write("\r\nError: Failed to pipe stdout\r\n");
+    });
+
+    instance.stderr.pipeTo(stderrStream).catch((error: any) => {
+        console.error("Error piping stderr:", error);
+        term.write("\r\nError: Failed to pipe stderr\r\n");
+    });
+}
+
+const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) => {
     const terminalRef = useRef<HTMLDivElement>(null);
     const [termInstance, setTermInstance] = useState<Terminal | null>(null);
-    const [_, setFitAddon] = useState<FitAddon | null>(null);
+    const [fitAddon, setFitAddon] = useState<FitAddon | null>(null);
     const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
+    const [r2Writer, setr2Writer] = useState<WritableStreamDefaultWriter<any> | undefined>(undefined);
+    const [dir, setDir] = useState<Directory | null>(null);
+
+    useImperativeHandle(ref, () => ({
+        focus: () => {
+            termInstance?.focus();
+            fitAddon?.fit();
+        },
+        dispose: () => {
+            try { termInstance?.dispose(); } catch {}
+        },
+        uploadFiles: async (files: FileList) => {
+            if (!dir) return;
+            const arr = Array.from(files);
+            await Promise.all(arr.map(async (f) => {
+                const buffer = new Uint8Array(await f.arrayBuffer());
+                await dir.writeFile(`/${f.name}`, buffer);
+            }));
+        },
+        getWriter: () => r2Writer,
+        getSearchAddon: () => searchAddon,
+        getDir: () => dir,
+    }), [termInstance, fitAddon, searchAddon, r2Writer, dir]);
+
+    useEffect(() => {
+        if (!terminalRef.current) return;
+        const term = new Terminal({
+            cursorBlink: true,
+            convertEol: true,
+            scrollback: 90000,
+            theme: { background: "#1e1e1e" },
+        });
+        const fit = new FitAddon();
+        const search = new SearchAddon();
+        term.loadAddon(fit);
+        term.loadAddon(search);
+        term.open(terminalRef.current);
+        fit.fit();
+        setTermInstance(term);
+        setFitAddon(fit);
+        setSearchAddon(search);
+        term.writeln("Starting...");
+        return () => {
+            term.dispose();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!pkg || !termInstance) return;
+        (async () => {
+            if (!file) {
+                termInstance.writeln("Error: No file provided");
+                return;
+            }
+            termInstance.write("\x1b[A");
+            termInstance.write("\x1b[2K");
+            termInstance.write("\r");
+
+            const mydir = new Directory();
+            setDir(mydir);
+
+            const instance = await pkg.entrypoint!.run({
+                args: [file.name],
+                mount: {
+                    ["./"]: { [file.name]: file.data },
+                    mydir,
+                },
+            });
+            connectStreams(instance, termInstance, setr2Writer);
+        })();
+    }, [pkg, termInstance]);
+
+    useEffect(() => {
+        if (active) {
+            setTimeout(() => {
+                try { fitAddon?.fit(); } catch {}
+                termInstance?.focus();
+            }, 0);
+        }
+    }, [active, fitAddon, termInstance]);
+
+    return (
+        <div style={{ display: active ? "block" : "none", height: "100%", width: "100%" }}>
+            <div ref={terminalRef} style={{ minHeight: "100vh", width: "100%" }} />
+        </div>
+    );
+});
+
+export default function Radare2Terminal() {
     const [wasmerInitialized, setWasmerInitialized] = useState(false);
     const [pkg, setPkg] = useState<Wasmer | null>(null);
     const [wasmUrl, setWasmUrl] = useState(
         "https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0"
     );
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [r2Writer, setr2Writer] = useState<
-        WritableStreamDefaultWriter<any> | undefined
-    >(undefined);
     const [searchTerm, setSearchTerm] = useState("");
     const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
     const [searchRegex, setSearchRegex] = useState(false);
@@ -31,25 +212,55 @@ export default function Radare2Terminal() {
     >("initializing");
     const [cachedVersions, setCachedVersions] = useState<string[]>([]);
     const [showCachedVersions, setShowCachedVersions] = useState(false);
-    const [dir, setDir] = useState<Directory | null>(null);
+
+    // Tabs state
+    const [tabs, setTabs] = useState<number[]>([0]);
+    const [activeTab, setActiveTab] = useState(0);
+    const tabRefs = useRef<Record<number, React.RefObject<R2TabHandle>>>({});
+    if (!tabRefs.current[0]) tabRefs.current[0] = createRef<R2TabHandle>();
+
+    const file = fileStore.getFile();
+    const isFileSelected = file !== null;
+
+    function getActiveWriter() {
+        const ref = tabRefs.current[activeTab]?.current;
+        return ref?.getWriter();
+    }
+    function getActiveSearchAddon() {
+        const ref = tabRefs.current[activeTab]?.current;
+        return ref?.getSearchAddon() || null;
+    }
+    function getActiveDir() {
+        const ref = tabRefs.current[activeTab]?.current;
+        return ref?.getDir() || null;
+    }
+
+    useEffect(() => {
+        const ref = tabRefs.current[activeTab]?.current;
+        ref?.focus();
+    }, [activeTab]);
+
     async function fetchCachedVersions() {
         const cache = await caches.open("wasm-cache");
         const keys = await cache.keys();
-        // console.log("Cached versions:", keys);
         setCachedVersions(keys.map((request) => new URL(request.url).pathname.replace("/", "")));
     }
-    fetchCachedVersions();
-    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, dir: Directory) => {
+    useEffect(() => { fetchCachedVersions(); }, []);
+    
+    const handleUploadInput = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!event.target.files) return;
-
+        const dir = getActiveDir();
+        if (!dir) {
+            // Try via tab's method as fallback
+            const ref = tabRefs.current[activeTab]?.current;
+            if (ref) await ref.uploadFiles(event.target.files);
+            return;
+        }
         const files = Array.from(event.target.files);
-        await Promise.all(
-            files.map(async (file) => {
-                const arrayBuffer = await file.arrayBuffer();
-                await dir.writeFile(`/${file.name}`, new Uint8Array(arrayBuffer));
-                console.log(`File ${file.name} uploaded to /${file.name}`);
-            })
-        );
+        await Promise.all(files.map(async (f) => {
+            const buffer = new Uint8Array(await f.arrayBuffer());
+            await dir.writeFile(`/${f.name}`, buffer);
+        }));
     };
 
     useEffect(() => {
@@ -139,155 +350,16 @@ export default function Radare2Terminal() {
         initializeWasmer();
 
         return () => {
-            if (termInstance) {
-                termInstance.dispose();
-            }
+            // Dispose all terminals on unmount
+            Object.values(tabRefs.current).forEach((r) => r.current?.dispose());
         };
     }, []);
 
-    useEffect(() => {
-        if (!wasmerInitialized || !pkg || !terminalRef.current) return;
-
-        const term = new Terminal({
-            cursorBlink: true,
-            convertEol: true,
-            scrollback: 90000,
-            theme: {
-                background: "#1e1e1e",
-            },
-        });
-        const fit = new FitAddon();
-        const search = new SearchAddon();
-
-        term.loadAddon(fit);
-        term.loadAddon(search);
-        term.open(terminalRef.current);
-        fit.fit();
-
-        setTermInstance(term);
-        setFitAddon(fit);
-        setSearchAddon(search);
-
-        term.writeln("Starting...");
-
-        return () => {
-            term.dispose();
-        };
-    }, [wasmerInitialized, pkg]);
-
-    useEffect(() => {
-        if (!termInstance || !pkg) return;
-
-        async function runRadare2() {
-            const file = fileStore.getFile();
-            if (!file) {
-                termInstance!.writeln("Error: No file provided");
-                return;
-            }
-
-            termInstance!.write("\x1b[A");
-            termInstance!.write("\x1b[2K");
-            termInstance!.write("\r");
-
-            const mydir = new Directory();
-            setDir(mydir);
-
-            const instance = await pkg!.entrypoint!.run({
-                args: [file.name],
-                mount: {
-                    ["./"]: {
-                        [file.name]: file.data,
-                    },
-                    mydir
-                },
-            });
-
-            connectStreams(instance, termInstance!);
-        }
-
-        runRadare2();
-    }, [termInstance, pkg]);
-
-    function connectStreams(instance: Instance, term: Terminal) {
-        const encoder = new TextEncoder();
-        const stdin = instance.stdin?.getWriter();
-        setr2Writer(stdin);
-
-        let cancelController: AbortController | null = null;
-
-        term.onData((data) => {
-            // Ctrl+C
-            if (data === "\x03") {
-                if (cancelController) {
-                    cancelController.abort();
-                    cancelController = null;
-                    term.write("^C\r");
-                    stdin?.write(encoder.encode("\r"));
-                }
-                return;
-            }
-
-            // CTRL+G
-            if (data === "\x07" || data === "G") {
-                const address = prompt("Enter address:");
-                if (address) {
-                    stdin?.write(encoder.encode(`s ${address}`));
-                    stdin?.write(encoder.encode("\r"));
-                }
-                return;
-            }
-
-            try {
-                if (cancelController) {
-                    cancelController.abort();
-                    cancelController = null;
-                }
-
-                cancelController = new AbortController();
-                stdin?.write(encoder.encode(data));
-            } catch (error) {
-                console.error("Error writing to stdin:", error);
-                term.write("\r\nError: Failed to write to stdin\r\n");
-            }
-        });
-
-        const stdoutStream = new WritableStream({
-            write: (chunk) => {
-                try {
-                    // console.log("stdout:", new TextDecoder().decode(chunk));
-                    term.write(chunk);
-                } catch (error) {
-                    console.error("Error writing to stdout:", error);
-                    term.write("\r\nError: Failed to write to stdout\r\n");
-                }
-            },
-        });
-
-        const stderrStream = new WritableStream({
-            write: (chunk) => {
-                try {
-                    term.write(chunk);
-                } catch (error) {
-                    console.error("Error writing to stderr:", error);
-                    term.write("\r\nError: Failed to write to stderr\r\n");
-                }
-            },
-        });
-
-        instance.stdout.pipeTo(stdoutStream).catch((error: any) => {
-            console.error("Error piping stdout:", error);
-            term.write("\r\nError: Failed to pipe stdout\r\n");
-        });
-
-        instance.stderr.pipeTo(stderrStream).catch((error: any) => {
-            console.error("Error piping stderr:", error);
-            term.write("\r\nError: Failed to pipe stderr\r\n");
-        });
-    }
+    
 
     const handleSearch = () => {
+        const searchAddon = getActiveSearchAddon();
         if (!searchAddon || !searchTerm) return;
-
         searchAddon.findNext(searchTerm, {
             caseSensitive: searchCaseSensitive,
             regex: searchRegex,
@@ -295,16 +367,46 @@ export default function Radare2Terminal() {
     };
 
     const handleSearchPrevious = () => {
+        const searchAddon = getActiveSearchAddon();
         if (!searchAddon || !searchTerm) return;
-
         searchAddon.findPrevious(searchTerm, {
             caseSensitive: searchCaseSensitive,
             regex: searchRegex,
         });
     };
 
-    const file = fileStore.getFile();
-    const isFileSelected = file !== null;
+    // Keyboard shortcuts for tab switching
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            // Ignore when typing in inputs
+            const target = e.target as HTMLElement | null;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+            if (e.altKey) {
+                if (e.code.startsWith('Digit')) {
+                    const num = parseInt(e.code.replace('Digit', ''), 10);
+                    if (num >= 1 && num <= 9) {
+                        e.preventDefault();
+                        const idx = Math.min(num - 1, tabs.length - 1);
+                        setActiveTab(tabs[idx]);
+                    }
+                } else if (e.code === 'ArrowRight') {
+                    e.preventDefault();
+                    const order = tabs;
+                    const curIndex = order.indexOf(activeTab);
+                    const next = order[(curIndex + 1) % order.length];
+                    setActiveTab(next);
+                } else if (e.code === 'ArrowLeft') {
+                    e.preventDefault();
+                    const order = tabs;
+                    const curIndex = order.indexOf(activeTab);
+                    const next = order[(curIndex - 1 + order.length) % order.length];
+                    setActiveTab(next);
+                }
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [tabs, activeTab]);
 
     return (
         <>
@@ -430,6 +532,59 @@ export default function Radare2Terminal() {
                 `}</style>
                 </div>
             )}
+            {/* Tabs bar */}
+            <div style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                height: '36px', padding: '4px 6px',
+                backgroundColor: '#111', color: '#fff',
+                overflowX: 'auto', position: 'sticky', top: 0, zIndex: 5,
+                borderBottom: '1px solid #333'
+            }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                    {tabs.map((id, i) => (
+                        <button key={id} onClick={() => setActiveTab(id)}
+                            style={{
+                                whiteSpace: 'nowrap',
+                                maxWidth: '160px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                backgroundColor: id === activeTab ? '#2d2d2d' : '#1c1c1c',
+                                color: '#fff', border: '1px solid #333',
+                                display: 'flex', alignItems: 'center', gap: '8px'
+                            }}>
+                            <span>{`Tab ${i + 1}`}{file ? `: ${file.name}` : ''}</span>
+                            <span onClick={(e) => {
+                                e.stopPropagation();
+                                const ref = tabRefs.current[id]?.current;
+                                ref?.dispose();
+                                setTabs((prev) => {
+                                    const idx = prev.indexOf(id);
+                                    const remaining = prev.filter((tid) => tid !== id);
+                                    if (activeTab === id) {
+                                        const nextActive = remaining.length ? remaining[Math.max(0, idx - 1)] : -1;
+                                        setActiveTab(nextActive);
+                                    }
+                                    return remaining;
+                                });
+                            }} style={{ cursor: 'pointer', opacity: 0.8 }}>×</span>
+                        </button>
+                    ))}
+                </div>
+                <button onClick={() => {
+                    setTabs((prev) => {
+                        const nextId = prev.length ? Math.max(...prev) + 1 : 0;
+                        const newArr = [...prev, nextId];
+                        if (!tabRefs.current[nextId]) tabRefs.current[nextId] = createRef<R2TabHandle>();
+                        setActiveTab(nextId);
+                        return newArr;
+                    });
+                }}
+                    style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: '6px', backgroundColor: '#1c1c1c', color: '#fff', border: '1px solid #333' }}>+
+                </button>
+            </div>
+
             <div
                 style={{
                     display: "grid",
@@ -466,10 +621,11 @@ export default function Radare2Terminal() {
                                     onClick={() => {
                                         if (!isFileSelected) return;
                                         const encoder = new TextEncoder();
-                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
-                                        r2Writer?.write(encoder.encode("\r"));
-                                        r2Writer?.write(encoder.encode("pd"));
-                                        r2Writer?.write(encoder.encode("\r"));
+                                        const w = getActiveWriter();
+                                        w?.write(encoder.encode('?e "\\ec"'));
+                                        w?.write(encoder.encode("\r"));
+                                        w?.write(encoder.encode("pd"));
+                                        w?.write(encoder.encode("\r"));
                                     }}
                                     disabled={!isFileSelected}
                                     style={{
@@ -488,10 +644,11 @@ export default function Radare2Terminal() {
                                     onClick={() => {
                                         if (!isFileSelected) return;
                                         const encoder = new TextEncoder();
-                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
-                                        r2Writer?.write(encoder.encode("\r"));
-                                        r2Writer?.write(encoder.encode("pdc"));
-                                        r2Writer?.write(encoder.encode("\r"));
+                                        const w = getActiveWriter();
+                                        w?.write(encoder.encode('?e "\\ec"'));
+                                        w?.write(encoder.encode("\r"));
+                                        w?.write(encoder.encode("pdc"));
+                                        w?.write(encoder.encode("\r"));
                                     }}
                                     disabled={!isFileSelected}
                                     style={{
@@ -511,10 +668,11 @@ export default function Radare2Terminal() {
                                     onClick={() => {
                                         if (!isFileSelected) return;
                                         const encoder = new TextEncoder();
-                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
-                                        r2Writer?.write(encoder.encode("\r"));
-                                        r2Writer?.write(encoder.encode("px"));
-                                        r2Writer?.write(encoder.encode("\r"));
+                                        const w = getActiveWriter();
+                                        w?.write(encoder.encode('?e "\\ec"'));
+                                        w?.write(encoder.encode("\r"));
+                                        w?.write(encoder.encode("px"));
+                                        w?.write(encoder.encode("\r"));
                                     }}
                                     disabled={!isFileSelected}
                                     style={{
@@ -534,10 +692,11 @@ export default function Radare2Terminal() {
                                     onClick={() => {
                                         if (!isFileSelected) return;
                                         const encoder = new TextEncoder();
-                                        r2Writer?.write(encoder.encode('?e "\\ec"'));
-                                        r2Writer?.write(encoder.encode("\r"));
-                                        r2Writer?.write(encoder.encode("iz"));
-                                        r2Writer?.write(encoder.encode("\r"));
+                                        const w = getActiveWriter();
+                                        w?.write(encoder.encode('?e "\\ec"'));
+                                        w?.write(encoder.encode("\r"));
+                                        w?.write(encoder.encode("iz"));
+                                        w?.write(encoder.encode("\r"));
                                     }}
                                     disabled={!isFileSelected}
                                     style={{
@@ -602,27 +761,27 @@ export default function Radare2Terminal() {
                                     }}
                                 >
                                     <button
-                                        onClick={handleSearch}
-                                        style={{
-                                            padding: "5px",
-                                            backgroundColor: "#2d2d2d",
-                                            color: "#ffffff",
-                                            width: "48%",
-                                        }}
-                                    >
-                                        Next
-                                    </button>
-                                    <button
-                                        onClick={handleSearchPrevious}
-                                        style={{
-                                            padding: "5px",
-                                            backgroundColor: "#2d2d2d",
-                                            color: "#ffffff",
-                                            width: "48%",
-                                        }}
-                                    >
-                                        Previous
-                                    </button>
+                                    onClick={handleSearch}
+                                    style={{
+                                        padding: "5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        width: "48%",
+                                    }}
+                                >
+                                    Next
+                                </button>
+                                <button
+                                    onClick={handleSearchPrevious}
+                                    style={{
+                                        padding: "5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        width: "48%",
+                                    }}
+                                >
+                                    Previous
+                                </button>
                                 </div>
                             </li>
                             {cachedVersions.length > 0 && (
@@ -703,11 +862,7 @@ export default function Radare2Terminal() {
                                     id="file-upload"
                                     type="file"
                                     multiple
-                                    onChange={(event) => {
-                                        if (dir) {
-                                            handleFileUpload(event, dir);
-                                        }
-                                    }}
+                                    onChange={handleUploadInput}
                                     style={{ display: "none" }}
                                 />
                             </li>
@@ -729,7 +884,18 @@ export default function Radare2Terminal() {
                         ☰
                     </button>
                 )}
-                <div ref={terminalRef} style={{ minHeight: "100vh", width: "100%" }} />
+                <div style={{ minHeight: "100vh", width: "100%" }}>
+                    {tabs.map((id) => {
+                        if (!tabRefs.current[id]) tabRefs.current[id] = createRef<R2TabHandle>();
+                        const ref = tabRefs.current[id];
+                        return (
+                            <R2Tab key={id} ref={ref} pkg={pkg} file={file} active={id === activeTab} />
+                        );
+                    })}
+                    {tabs.length === 0 && (
+                        <div style={{ color: '#ccc', padding: '1rem' }}>No tabs open</div>
+                    )}
+                </div>
             </div>
         </>
     );
