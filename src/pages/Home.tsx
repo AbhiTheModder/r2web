@@ -99,6 +99,12 @@ export default function Home() {
     };
 
     return (
+        <>
+            <style>{`
+                html, body, #root { height: 100%; }
+                html, body { margin: 0; padding: 0; overscroll-behavior: none; }
+                /* Global scroll container configured in main.tsx (.app-root) */
+            `}</style>
         <div style={styles.pageContainer}>
             <main style={styles.mainContent}>
                 <div style={styles.card}>
@@ -213,6 +219,7 @@ export default function Home() {
                 </p>
             </footer>
         </div>
+        </>
     );
 }
 
