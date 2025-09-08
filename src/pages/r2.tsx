@@ -358,6 +358,14 @@ export default function Radare2Terminal() {
 
     return (
         <>
+            {/* Global reset to fill viewport and prevent Safari bounce */}
+            <style>{`
+                html, body, #root { height: 100%; }
+                html, body { margin: 0; padding: 0; background: #1e1e1e; overscroll-behavior: none; }
+                /* Prevent page scroll/rubber-band; we scroll inside .app-root instead */
+                body { position: fixed; inset: 0; overflow: hidden; }
+                .app-root { height: 100vh; width: 100vw; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+            `}</style>
             {isDownloading && (
                 <div
                     style={{
@@ -480,17 +488,17 @@ export default function Radare2Terminal() {
                 `}</style>
                 </div>
             )}
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: sidebarOpen ? "200px 1fr" : "0 1fr",
-                    minHeight: "100vh",
-                    width: "100%",
-                    transition: "grid-template-columns 0.3s",
-                    backgroundColor: "#1e1e1e",
-                    borderRadius: "5px",
-                }}
-            >
+            <div className="app-root">
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: sidebarOpen ? "200px 1fr" : "0 1fr",
+                        height: "100vh",
+                        width: "100vw",
+                        transition: "grid-template-columns 0.3s",
+                        backgroundColor: "#1e1e1e",
+                    }}
+                >
                 {sidebarOpen && (
                     <div
                         style={{ padding: "10px", overflow: "hidden", color: "#ffffff" }}
@@ -801,7 +809,8 @@ export default function Radare2Terminal() {
                         ☰
                     </button>
                 )}
-                <div ref={terminalRef} style={{ minHeight: "100vh", width: "100%" }} />
+                <div ref={terminalRef} style={{ height: "100vh", width: "100%" }} />
+                </div>
             </div>
         </>
     );
