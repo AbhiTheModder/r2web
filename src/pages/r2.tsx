@@ -32,6 +32,8 @@ export default function Radare2Terminal() {
     const [cachedVersions, setCachedVersions] = useState<string[]>([]);
     const [showCachedVersions, setShowCachedVersions] = useState(false);
     const [dir, setDir] = useState<Directory | null>(null);
+    const [instance, setInstance] = useState<Instance | null>(null);
+
     async function fetchCachedVersions() {
         const cache = await caches.open("wasm-cache");
         const keys = await cache.keys();
@@ -198,9 +200,10 @@ export default function Radare2Terminal() {
                     ["./"]: {
                         [file.name]: file.data,
                     },
-                    mydir
                 },
             });
+
+            setInstance(instance);
 
             connectStreams(instance, termInstance!);
         }
@@ -284,6 +287,53 @@ export default function Radare2Terminal() {
             term.write("\r\nError: Failed to pipe stderr\r\n");
         });
     }
+
+    // Restart the current session by spawning a new Wasm instance running the same binary
+    const restartSession = async () => {
+        if (!pkg || !termInstance) return;
+        const file = fileStore.getFile();
+        if (!file) {
+            termInstance!.writeln("Error: No file provided");
+            return;
+        }
+
+        termInstance!.write("\x1b[A");
+        termInstance!.write("\x1b[2K");
+        termInstance!.write("\r");
+        termInstance!.writeln("Restarting session...");
+
+        // Close previous stdin writer if available to help terminate previous process streams
+        try {
+            await r2Writer?.close?.();
+        } catch (e) {
+            // ignore
+        }
+
+        // Attempt to close previous instance streams if possible
+        try {
+            if (instance?.stdin) {
+                const w = instance.stdin.getWriter?.();
+                try { w?.close?.(); } catch {}
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        const mydir = new Directory();
+        setDir(mydir);
+
+        const newInstance = await pkg.entrypoint!.run({
+            args: [file.name],
+            mount: {
+                ["./"]: {
+                    [file.name]: file.data,
+                },
+            },
+        });
+
+        setInstance(newInstance);
+        connectStreams(newInstance, termInstance);
+    };
 
     const handleSearch = () => {
         if (!searchAddon || !searchTerm) return;
@@ -461,6 +511,21 @@ export default function Radare2Terminal() {
                             </button>
                         </div>
                         <ul style={{ listStyleType: "none", padding: 0 }}>
+                            <li style={{ marginBottom: "8px" }}>
+                                <button
+                                    onClick={restartSession}
+                                    disabled={!isFileSelected || !pkg}
+                                    style={{
+                                        padding: "6px 5px",
+                                        backgroundColor: "#2d2d2d",
+                                        color: "#ffffff",
+                                        width: "100%",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    Restart Session
+                                </button>
+                            </li>
                             <li>
                                 <button
                                     onClick={() => {
