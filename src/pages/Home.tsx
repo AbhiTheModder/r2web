@@ -165,7 +165,6 @@ export default function Home() {
                             type="file"
                             onChange={onFileChange}
                             style={styles.hiddenInput}
-                            accept=".exe,.dll,.so,.bin,.elf,*"
                         />
                     </div>
 
