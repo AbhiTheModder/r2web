@@ -440,7 +440,67 @@ export default function Radare2Terminal() {
             {/* Global reset to fill viewport and prevent Safari bounce */}
             <style>{`
                 html, body, #root { height: 100%; margin: 0; padding: 0; overflow: hidden; }
-                body { background: #1e1e1e; overscroll-behavior: none; }
+                html, body { margin: 0; padding: 0; background: #1e1e1e; overscroll-behavior: none; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+                /* Prevent page scroll/rubber-band; we scroll inside .app-root instead */
+                body { position: fixed; inset: 0; overflow: hidden; }
+                .app-root { height: 100vh; width: 100vw; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+                /* Button styles */
+                .app-root button, .app-root label[htmlFor="file-upload"] {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 8px 12px !important;
+                    background: linear-gradient(180deg, #2f2f35, #242427) !important;
+                    color: #fff !important;
+                    border: 1px solid rgba(255,255,255,0.06);
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+                    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+                    text-align: center;
+                }
+                .app-root button:hover:not(:disabled), .app-root label[htmlFor="file-upload"]:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 10px 24px rgba(0,0,0,0.5);
+                    background: linear-gradient(180deg, #3b82f6, #2563eb) !important;
+                }
+                .app-root button:active:not(:disabled) {
+                    transform: translateY(0);
+                }
+                .app-root button:disabled {
+                    opacity: 0.45;
+                    cursor: not-allowed;
+                    box-shadow: none;
+                    background: linear-gradient(180deg, #2d2d2d, #262626) !important;
+                }
+                .app-root .danger {
+                    background: linear-gradient(180deg, #ff5f6d, #ef4444) !important;
+                    border: 1px solid rgba(255,0,0,0.15);
+                }
+                .app-root .ghost {
+                    background: transparent !important;
+                    border: 1px solid rgba(255,255,255,0.08);
+                    box-shadow: none;
+                }
+                /* Small icon button */
+                .app-root .icon-btn {
+                    padding: 6px 8px !important;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    min-width: 36px;
+                }
+
+                /* Make inputs match theme */
+                .app-root input[type="text"] {
+                    padding: 6px 8px;
+                    background: #2d2d2d;
+                    color: #fff;
+                    border-radius: 6px;
+                    border: none;
+                }
             `}</style>
             {isDownloading && (
                 <div
@@ -640,9 +700,9 @@ export default function Radare2Terminal() {
                                         alignItems: "center",
                                     }}
                                 >
-                                    <h3>Options</h3>
+                                    <h3>r2web</h3>
                                     <button
-                                        style={{ backgroundColor: "#2d2d2d", color: "#ffffff" }}
+                                        className="icon-btn"
                                         onClick={() => setSidebarOpen(false)}
                                     >
                                         ×
@@ -889,15 +949,7 @@ export default function Radare2Terminal() {
                                                                     await cache.delete(`/${version}`);
                                                                     fetchCachedVersions();
                                                                 }}
-                                                                style={{
-                                                                    padding: "5px",
-                                                                    backgroundColor: "#a10a0aff",
-                                                                    color: "#ffffff",
-                                                                    display: "flex",
-                                                                    justifyContent: "center",
-                                                                    alignItems: "center",
-                                                                    marginLeft: "5px",
-                                                                }}
+                                                                className="danger" style={{ padding: "5px", display: "flex", justifyContent: "center", alignItems: "center", marginLeft: "5px" }}
                                                             >
                                                                 X
                                                             </button>
@@ -942,14 +994,7 @@ export default function Radare2Terminal() {
                         {!sidebarOpen && (
                             <button
                                 onClick={() => setSidebarOpen(true)}
-                                style={{
-                                    position: "fixed",
-                                    left: "10px",
-                                    top: "10px",
-                                    zIndex: 1000,
-                                    backgroundColor: "#2d2d2d",
-                                    color: "#ffffff",
-                                }}
+                                className="icon-btn" style={{ position: "fixed", left: "10px", top: "10px", zIndex: 1000 }}
                             >
                                 ☰
                             </button>
