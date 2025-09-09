@@ -809,9 +809,12 @@ export default function Radare2Terminal() {
                                             onClick={() => {
                                                 if (!isFileSelected) return;
                                                 const writer = getActiveWriter();
+                                                const encoder = new TextEncoder();
                                                 if (writer) {
-                                                    const data = new TextEncoder().encode('?e "\\ec"\riz\r');
-                                                    writer.write(data);
+                                                    writer?.write(encoder.encode('?e "\\ec"'));
+                                                    writer?.write(encoder.encode("\r"));
+                                                    writer?.write(encoder.encode("iz"));
+                                                    writer?.write(encoder.encode("\r"));
                                                 }
                                             }}
                                             disabled={!isFileSelected}
