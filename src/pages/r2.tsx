@@ -962,36 +962,39 @@ export default function Radare2Terminal() {
                                             )}
                                         </li>
                                     )}
-                                    <li style={{ marginTop: "10px" }}>
-                                        <label
-                                            htmlFor="file-upload"
-                                            style={{
-                                                padding: "5px 5px 5px 5px",
-                                                backgroundColor: "#2d2d2d",
-                                                color: "#ffffff",
-                                                width: "100%",
-                                                textAlign: "center",
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            Upload Files
-                                        </label>
-                                        <input
-                                            id="file-upload"
-                                            type="file"
-                                            multiple
-                                            onChange={(event) => {
-                                                const ref = tabRefs.current[activeTab]?.current;
-                                                if (ref) {
-                                                    if (event.target.files) {
-                                                        ref.uploadFiles(event.target.files);
-                                                    }
-                                                }
-                                            }}
-                                            style={{ display: "none" }}
-                                        />
-                                    </li>
                                 </ul>
+                                <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => document.getElementById("file-upload")?.click()}
+                                        style={{
+                                            padding: "5px 5px 5px 5px",
+                                            backgroundColor: "#2d2d2d",
+                                            color: "#ffffff",
+                                            width: "100%",
+                                            textAlign: "center",
+                                            cursor: "pointer",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                        }}
+                                    >
+                                        Upload Files
+                                    </button>
+                                    <input
+                                        id="file-upload"
+                                        type="file"
+                                        multiple
+                                        onChange={(event) => {
+                                            const ref = tabRefs.current[activeTab]?.current;
+                                            if (ref) {
+                                                if (event.target.files) {
+                                                    ref.uploadFiles(event.target.files);
+                                                }
+                                            }
+                                        }}
+                                        style={{ display: "none" }}
+                                    />
+                                </div>
                             </div>
                         )}
                         {!sidebarOpen && (
