@@ -44,6 +44,12 @@ bun install
 bun dev
 ```
 
+you'll need to run a very small proxy api server to workaround with browser's CORS policy, to do that run:
+```shell
+bun run api/wasm.js # or node api/wasm.js if you don't have bun installed
+```
+which will run a local proxy server at `http://localhost:3000/wasm`, that will be used to fetch the wasm file from the github releases.
+
 Or skip the setup and [try it live](https://r2.revengi.in).
 
 > [!TIP]
