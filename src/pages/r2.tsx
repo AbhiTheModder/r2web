@@ -299,7 +299,7 @@ export default function Radare2Terminal() {
 
             let response: Response;
             const wasmUrl = import.meta.env.MODE === "production"
-                ? `https://${import.meta.env.VITE_VERCEL_PROJECT_PRODUCTION_URL}/api/wasm?version=${version}`
+                ? `https://${import.meta.env.VITE_VERCEL_PROJECT_PRODUCTION_URL}/api/vercel?version=${version}`
                 : `http://localhost:3000/wasm/${version}`;
             try {
                 response = await fetch(wasmUrl);
