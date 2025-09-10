@@ -240,8 +240,20 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
     }, [active, fitAddon, termInstance]);
 
     return (
-        <div style={{ display: active ? "block" : "none", height: "100%", width: "100%", position: "absolute", inset: 0 }}>
-            <div ref={terminalRef} style={{ height: "100%", width: "100%" }} />
+        <div style={{
+            display: active ? "block" : "none",
+            height: "100%",
+            width: "100%",
+            position: "absolute",
+            inset: 0,
+            overflow: "hidden"
+        }}>
+            <div ref={terminalRef} style={{
+                height: "100%",
+                width: "100%",
+                position: "absolute",
+                inset: 0
+            }} />
         </div>
     );
 });
@@ -433,6 +445,12 @@ export default function Radare2Terminal() {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [tabs, activeTab]);
+
+    useEffect(() => {
+        if (window.innerWidth < 768) {
+            setSidebarOpen(false);
+        }
+    }, []);
 
     return (
         <>
@@ -677,14 +695,14 @@ export default function Radare2Terminal() {
                         style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: '6px', backgroundColor: '#1c1c1c', color: '#fff', border: '1px solid #333' }}>+
                     </button>
                 </div>
-                <div className="app-root">
+                <div className="app-root" style={{ position: 'relative', display: 'flex', flex: 1 }}>
                     <div
                         style={{
-                            display: "grid",
-                            gridTemplateColumns: sidebarOpen ? "200px 1fr" : "0 1fr",
-                            height: "100%",
+                            position: 'absolute',
+                            inset: 0,
+                            display: "flex",
                             width: "100%",
-                            transition: "grid-template-columns 0.3s",
+                            transition: "0.3s",
                             backgroundColor: "#1e1e1e",
                         }}
                     >
