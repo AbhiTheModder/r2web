@@ -298,8 +298,8 @@ export default function Radare2Terminal() {
             setDownloadProgress(30);
 
             let response: Response;
-            const wasmUrl = process.env.NODE_ENV === "production"
-                ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/api/wasm?version=${version}`
+            const wasmUrl = import.meta.env.MODE === "production"
+                ? `https://${import.meta.env.VITE_VERCEL_PROJECT_PRODUCTION_URL}/api/wasm?version=${version}`
                 : `http://localhost:3000/wasm/${version}`;
             try {
                 response = await fetch(wasmUrl);
