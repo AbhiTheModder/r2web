@@ -22,7 +22,7 @@ export default function Home() {
     const [file, setFile] = useState<File | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [selectedVersion, setSelectedVersion] = useState("6.0.0");
+    const [selectedVersion, setSelectedVersion] = useState("6.0.3");
     const [cacheVersion, setCacheVersion] = useState(false);
     const navigate = useNavigate();
 

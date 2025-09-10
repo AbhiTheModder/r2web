@@ -192,8 +192,12 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                 if (currentInput.trim() !== '') {
                     history.push(currentInput);
                     historyIndex = history.length;
+                    term.write('\x1b[2K\r\x1b[33m]>  \x1b[0m\x1b[32m');
                 }
+                stdin?.write(encoder.encode(currentInput));
+                stdin?.write(encoder.encode('\r'));
                 currentInput = '';
+                return;
             }
             // Up arrow
             else if (data === '\x1b[A') {
@@ -202,6 +206,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                     term.write('\x1b[2K\r' + history[historyIndex]);
                     currentInput = history[historyIndex];
                 }
+                return;
             }
             // Down arrow
             else if (data === '\x1b[B') {
@@ -214,6 +219,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                     term.write('\x1b[2K\r');
                     currentInput = '';
                 }
+                return;
             }
             // Backspace
             else if (data === '\x7f') {
@@ -221,6 +227,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                     currentInput = currentInput.slice(0, -1);
                     term.write('\x1b[D \x1b[D');
                 }
+                return;
             }
             else {
                 currentInput += data;
@@ -366,7 +373,7 @@ export default function Radare2Terminal() {
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
-        const version = urlParams.get("version") || "6.0.0";
+        const version = urlParams.get("version") || "6.0.3";
         const doCache = urlParams.get("cache") === "true";
         async function initializeWasmer() {
             const { Wasmer, init } = await import("@wasmer/sdk");
