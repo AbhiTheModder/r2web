@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle, createRef
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
+import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { fileStore } from "../store/FileStore";
 import wasmerSDKModule from "@wasmer/sdk/wasm?url";
 import "xterm/css/xterm.css";
@@ -105,8 +106,10 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
         });
         const fit = new FitAddon();
         const search = new SearchAddon();
+        const clipboard = new ClipboardAddon();
         term.loadAddon(fit);
         term.loadAddon(search);
+        term.loadAddon(clipboard);
         term.open(terminalRef.current);
         fit.fit();
         setTermInstance(term);
@@ -136,6 +139,33 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                     cancelController.abort();
                     cancelController = null;
                     term.write("^C\r");
+                    stdin?.write(encoder.encode("\r"));
+                }
+                return;
+            }
+
+            // Ctrl+V
+            if (data === "\x16") {
+                navigator.clipboard.readText().then((text) => {
+                    stdin?.write(encoder.encode(text));
+                }).catch((error) => {
+                    console.error("Error reading clipboard:", error);
+                    term.write("\r\nError: Failed to read clipboard\r\n");
+                });
+                return;
+            }
+
+            // Ctrl+R
+            if (data === "\x12" || data === "R") {
+                restartSession();
+                return;
+            }
+
+            // Ctrl+F
+            if (data === "\x06" || data === "F") {
+                const searchTerm = prompt("Enter search term:");
+                if (searchTerm) {
+                    stdin?.write(encoder.encode(`/ ${searchTerm}`));
                     stdin?.write(encoder.encode("\r"));
                 }
                 return;

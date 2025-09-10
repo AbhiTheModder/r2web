@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@wasmer/sdk": "^0.9.0",
+    "@xterm/addon-clipboard": "^0.1.0",
     "@xterm/addon-search": "^0.15.0",
     "axios": "^1.11.0",
     "coi-serviceworker": "^0.1.7",
