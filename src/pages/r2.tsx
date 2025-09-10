@@ -248,9 +248,6 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
 
 export default function Radare2Terminal() {
     const [pkg, setPkg] = useState<Wasmer | null>(null);
-    const [wasmUrl, setWasmUrl] = useState(
-        "https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0"
-    );
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
@@ -281,7 +278,6 @@ export default function Radare2Terminal() {
         const urlParams = new URLSearchParams(window.location.search);
         const version = urlParams.get("version") || "6.0.0";
         const doCache = urlParams.get("cache") === "true";
-        setWasmUrl(`https://radareorg.github.io/r2wasm/radare2.wasm?v=${version}`);
         async function initializeWasmer() {
             const { Wasmer, init } = await import("@wasmer/sdk");
             await init({ module: wasmerSDKModule });
@@ -302,6 +298,9 @@ export default function Radare2Terminal() {
             setDownloadProgress(30);
 
             let response: Response;
+            const wasmUrl = process.env.NODE_ENV === "production"
+                ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/api/wasm?version=${version}`
+                : `http://localhost:3000/wasm/${version}`;
             try {
                 response = await fetch(wasmUrl);
             } catch (e) {
