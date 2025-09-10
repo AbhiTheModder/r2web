@@ -614,6 +614,7 @@ export default function Radare2Terminal() {
                             height: "80px",
                             marginBottom: "30px",
                             animation: "pulse 2s infinite",
+                            objectFit: "contain",
                         }}
                     />
 
