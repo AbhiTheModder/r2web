@@ -4,6 +4,7 @@ import { FitAddon } from "xterm-addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { fileStore } from "../store/FileStore";
 import wasmerSDKModule from "@wasmer/sdk/wasm?url";
+import { unzip } from "fflate";
 import "xterm/css/xterm.css";
 import { Directory, type Instance, type Wasmer } from "@wasmer/sdk";
 
@@ -248,9 +249,6 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
 
 export default function Radare2Terminal() {
     const [pkg, setPkg] = useState<Wasmer | null>(null);
-    const [wasmUrl, setWasmUrl] = useState(
-        "https://radareorg.github.io/r2wasm/radare2.wasm?v=6.0.0"
-    );
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
@@ -281,7 +279,6 @@ export default function Radare2Terminal() {
         const urlParams = new URLSearchParams(window.location.search);
         const version = urlParams.get("version") || "6.0.0";
         const doCache = urlParams.get("cache") === "true";
-        setWasmUrl(`https://radareorg.github.io/r2wasm/radare2.wasm?v=${version}`);
         async function initializeWasmer() {
             const { Wasmer, init } = await import("@wasmer/sdk");
             await init({ module: wasmerSDKModule });
@@ -302,8 +299,9 @@ export default function Radare2Terminal() {
             setDownloadProgress(30);
 
             let response: Response;
+            const zipUrl = `https://github.com/radareorg/radare2/releases/download/${version}/radare2-${version}-wasi.zip`;
             try {
-                response = await fetch(wasmUrl);
+                response = await fetch(zipUrl);
             } catch (e) {
                 console.error(e);
                 setIsDownloading(false);
@@ -336,22 +334,47 @@ export default function Radare2Terminal() {
             setDownloadProgress(85);
 
             const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-            const buffer = new Uint8Array(totalLength);
+            const zipBuffer = new Uint8Array(totalLength);
             let offset = 0;
             for (const chunk of chunks) {
-                buffer.set(chunk, offset);
+                zipBuffer.set(chunk, offset);
                 offset += chunk.length;
             }
 
-            setDownloadProgress(90);
+            setDownloadProgress(85);
 
-            const packageInstance = Wasmer.fromWasm(buffer);
-            setPkg(packageInstance);
+            const extractWasm = () => new Promise<Uint8Array>((resolve, reject) => {
+                unzip(zipBuffer, (err, unzipped) => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
 
-            setDownloadProgress(95);
+                    for (const [path, contents] of Object.entries(unzipped)) {
+                        if (path.endsWith('radare2.wasm')) {
+                            resolve(contents);
+                            return;
+                        }
+                    }
+                    reject(new Error('Could not find radare2.wasm in the zip file'));
+                });
+            });
 
-            if (doCache) {
-                await cache.put(version, new Response(buffer));
+            let wasmBuffer: Uint8Array;
+            try {
+                wasmBuffer = await extractWasm();
+                setDownloadProgress(90);
+                const packageInstance = Wasmer.fromWasm(wasmBuffer);
+                setPkg(packageInstance);
+                setDownloadProgress(95);
+
+                if (doCache) {
+                    await cache.put(version, new Response(wasmBuffer));
+                }
+            } catch (error) {
+                console.error('Error extracting WASM:', error);
+                setIsDownloading(false);
+                return;
             }
 
             setDownloadProgress(100);

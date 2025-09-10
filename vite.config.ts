@@ -16,10 +16,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-  entryFileNames: 'index.mjs',
-  chunkFileNames: '[name].js',
-  assetFileNames: '[name].[ext]',
-},
+        entryFileNames: 'index.mjs',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]',
+      },
     },
   },
 })
