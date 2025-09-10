@@ -299,11 +299,15 @@ export default function Radare2Terminal() {
             setDownloadProgress(30);
 
             let response: Response;
-            const zipUrl = `https://github.com/radareorg/radare2/releases/download/${version}/radare2-${version}-wasi.zip`;
+            const proxyZipUrl = `/api/radare2-download?version=${version}`;
             try {
-                response = await fetch(zipUrl);
+                response = await fetch(proxyZipUrl);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
             } catch (e) {
-                console.error(e);
+                console.error('Failed to download radare2 package:', e);
                 setIsDownloading(false);
                 return;
             }
@@ -382,6 +386,7 @@ export default function Radare2Terminal() {
 
             setTimeout(() => setIsDownloading(false), 500);
         }
+
 
         initializeWasmer();
 
