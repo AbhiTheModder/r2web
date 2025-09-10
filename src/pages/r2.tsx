@@ -161,6 +161,12 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                 return;
             }
 
+            // Ctrl+L
+            if (data === "\x0C" || data === "L") {
+                term.clear();
+                return;
+            }
+
             // Ctrl+F
             if (data === "\x06" || data === "F") {
                 const searchTerm = prompt("Enter search term:");
@@ -584,6 +590,17 @@ export default function Radare2Terminal() {
                     min-width: 36px;
                 }
 
+                .app-root .tab-button {
+                    background: none !important;
+                    box-shadow: none !important;
+                }
+                .app-root .tab-button.active {
+                    background-color: #485a76ff !important;
+                }
+                .app-root .tab-button.inactive {
+                    background-color: #1c1c1c !important;
+                }
+
                 /* Make inputs match theme */
                 .app-root input[type="text"] {
                     padding: 6px 8px;
@@ -728,7 +745,10 @@ export default function Radare2Terminal() {
                 }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
                         {tabs.map((id, i) => (
-                            <button key={id} onClick={() => setActiveTab(id)}
+                            <button
+                                key={id}
+                                onClick={() => setActiveTab(id)}
+                                className={`tab-button ${id === activeTab ? 'active' : 'inactive'}`}
                                 style={{
                                     whiteSpace: 'nowrap',
                                     maxWidth: '160px',
@@ -736,9 +756,11 @@ export default function Radare2Terminal() {
                                     textOverflow: 'ellipsis',
                                     padding: '6px 10px',
                                     borderRadius: '6px',
-                                    backgroundColor: id === activeTab ? '#2d2d2d' : '#1c1c1c',
-                                    color: '#fff', border: '1px solid #333',
-                                    display: 'flex', alignItems: 'center', gap: '8px'
+                                    color: '#fff',
+                                    border: '1px solid #333',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
                                 }}>
                                 <span>{`Tab ${i + 1}`}{file ? `: ${file.name}` : ''}</span>
                                 <span onClick={(e) => {
