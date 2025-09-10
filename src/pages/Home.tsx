@@ -32,8 +32,7 @@ export default function Home() {
         }
     };
     const [r2Versions, setR2Versions] = useState([
-        { value: "6.0.0", label: "r2 6.0.0" },
-        { value: "5.8.8", label: "r2 5.8.8" },
+        { value: "6.0.3", label: "r2 6.0.3" },
     ]);
     useEffect(() => {
         const fetchR2Versions = async () => {
@@ -43,8 +42,8 @@ export default function Home() {
                 const versions = data.map((release: { tag_name: any; }) => ({
                     value: release.tag_name,
                     label: `r2 ${release.tag_name}`,
-                }));
-                setR2Versions(versions);
+                })).filter((version: { value: string; }) => version.value !== "6.0.3");
+                setR2Versions(prevVersions => [...prevVersions, ...versions]);
             } catch (error) {
                 console.error('Error fetching r2 versions:', error);
             }
@@ -105,119 +104,119 @@ export default function Home() {
                 html, body { margin: 0; padding: 0; overscroll-behavior: none; }
                 /* Global scroll container configured in main.tsx (.app-root) */
             `}</style>
-        <div style={styles.pageContainer}>
-            <main style={styles.mainContent}>
-                <div style={styles.card}>
-                    <h1 style={styles.title}>
-                        Radare2 Web
-                    </h1>
-                    <p style={styles.subtitle}>
-                        Upload binary files for reverse engineering analysis
-                    </p>
-
-                    <div style={styles.versionSelector}>
-                        <label htmlFor="version-select" style={styles.versionLabel}>
-                            Select Radare2 Version:
-                        </label>
-                        <select
-                            id="version-select"
-                            value={selectedVersion}
-                            onChange={(e) => setSelectedVersion(e.target.value)}
-                            style={styles.versionDropdown}
-                        >
-                            {r2Versions.map((version) => (
-                                <option key={version.value} value={version.value}>
-                                    {version.label}
-                                </option>
-                            ))}
-                        </select>
-                        <label style={styles.cacheLabel}>
-                            <input
-                                type="checkbox"
-                                checked={cacheVersion}
-                                onChange={() => setCacheVersion(!cacheVersion)}
-                                style={styles.cacheCheckbox}
-                            />
-                            Cache this version
-                        </label>
-                    </div>
-
-                    <div
-                        onDragOver={onDragOver}
-                        onDragLeave={onDragLeave}
-                        onDrop={onDrop}
-                        style={{
-                            ...styles.dropZone,
-                            border: `2px dashed ${isDragging ? "#007bff" : "#ddd"}`,
-                            background: isDragging ? "#f0f8ff" : "#fafafa",
-                        }}
-                    >
-                        <UploadIcon />
-                        <p style={styles.dropZoneText}>
-                            Drag & drop your file here
+            <div style={styles.pageContainer}>
+                <main style={styles.mainContent}>
+                    <div style={styles.card}>
+                        <h1 style={styles.title}>
+                            Radare2 Web
+                        </h1>
+                        <p style={styles.subtitle}>
+                            Upload binary files for reverse engineering analysis
                         </p>
-                        <p style={styles.orText}>or</p>
-                        <label htmlFor="file-upload" style={styles.browseLabel}>
-                            browse to upload
-                        </label>
-                        <input
-                            id="file-upload"
-                            type="file"
-                            onChange={onFileChange}
-                            style={styles.hiddenInput}
-                        />
-                    </div>
 
-                    {file && (
-                        <div style={styles.fileInfo}>
-                            <div style={styles.fileName}>
-                                {file.name}
-                            </div>
-                            <div style={styles.fileSize}>
-                                Size: {formatFileSize(file.size)}
-                            </div>
+                        <div style={styles.versionSelector}>
+                            <label htmlFor="version-select" style={styles.versionLabel}>
+                                Select Radare2 Version:
+                            </label>
+                            <select
+                                id="version-select"
+                                value={selectedVersion}
+                                onChange={(e) => setSelectedVersion(e.target.value)}
+                                style={styles.versionDropdown}
+                            >
+                                {r2Versions.map((version) => (
+                                    <option key={version.value} value={version.value}>
+                                        {version.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <label style={styles.cacheLabel}>
+                                <input
+                                    type="checkbox"
+                                    checked={cacheVersion}
+                                    onChange={() => setCacheVersion(!cacheVersion)}
+                                    style={styles.cacheCheckbox}
+                                />
+                                Cache this version
+                            </label>
                         </div>
-                    )}
 
-                    <button
-                        disabled={!file || isUploading}
-                        onClick={onOpenRadare2}
-                        style={{
-                            ...styles.button,
-                            background: (!file || isUploading) ? "#ccc" : "#007bff",
-                            cursor: (!file || isUploading) ? "not-allowed" : "pointer",
-                            boxShadow: (!file || isUploading) ? "none" : "0 4px 10px rgba(0, 123, 255, 0.3)",
-                        }}
-                        onMouseEnter={(e) => {
-                            if (file && !isUploading) {
-                                e.currentTarget.style.background = "#0056b3";
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            if (file && !isUploading) {
-                                e.currentTarget.style.background = "#007bff";
-                            }
-                        }}
-                    >
-                        {isUploading ? "Processing..." : "Open with Radare2"}
-                    </button>
-                </div>
-            </main>
+                        <div
+                            onDragOver={onDragOver}
+                            onDragLeave={onDragLeave}
+                            onDrop={onDrop}
+                            style={{
+                                ...styles.dropZone,
+                                border: `2px dashed ${isDragging ? "#007bff" : "#ddd"}`,
+                                background: isDragging ? "#f0f8ff" : "#fafafa",
+                            }}
+                        >
+                            <UploadIcon />
+                            <p style={styles.dropZoneText}>
+                                Drag & drop your file here
+                            </p>
+                            <p style={styles.orText}>or</p>
+                            <label htmlFor="file-upload" style={styles.browseLabel}>
+                                browse to upload
+                            </label>
+                            <input
+                                id="file-upload"
+                                type="file"
+                                onChange={onFileChange}
+                                style={styles.hiddenInput}
+                            />
+                        </div>
 
-            <footer style={styles.footer}>
-                <p style={styles.footerText}>
-                    Built with ⌨️, 🖱️ & ❤️ by{" "}
-                    <a
-                        href="https://github.com/AbhiTheModder"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={styles.footerLink}
-                    >
-                        Abhi
-                    </a>
-                </p>
-            </footer>
-        </div>
+                        {file && (
+                            <div style={styles.fileInfo}>
+                                <div style={styles.fileName}>
+                                    {file.name}
+                                </div>
+                                <div style={styles.fileSize}>
+                                    Size: {formatFileSize(file.size)}
+                                </div>
+                            </div>
+                        )}
+
+                        <button
+                            disabled={!file || isUploading}
+                            onClick={onOpenRadare2}
+                            style={{
+                                ...styles.button,
+                                background: (!file || isUploading) ? "#ccc" : "#007bff",
+                                cursor: (!file || isUploading) ? "not-allowed" : "pointer",
+                                boxShadow: (!file || isUploading) ? "none" : "0 4px 10px rgba(0, 123, 255, 0.3)",
+                            }}
+                            onMouseEnter={(e) => {
+                                if (file && !isUploading) {
+                                    e.currentTarget.style.background = "#0056b3";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (file && !isUploading) {
+                                    e.currentTarget.style.background = "#007bff";
+                                }
+                            }}
+                        >
+                            {isUploading ? "Processing..." : "Open with Radare2"}
+                        </button>
+                    </div>
+                </main>
+
+                <footer style={styles.footer}>
+                    <p style={styles.footerText}>
+                        Built with ⌨️, 🖱️ & ❤️ by{" "}
+                        <a
+                            href="https://github.com/AbhiTheModder"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={styles.footerLink}
+                        >
+                            Abhi
+                        </a>
+                    </p>
+                </footer>
+            </div>
         </>
     );
 }

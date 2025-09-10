@@ -124,6 +124,9 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
         setr2Writer(stdin);
 
         let cancelController: AbortController | null = null;
+        let history: string[] = [];
+        let historyIndex = -1;
+        let currentInput = '';
         onDataDisposableRef.current?.dispose();
 
         onDataDisposableRef.current = term.onData((data) => {
@@ -146,6 +149,45 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                     stdin?.write(encoder.encode("\r"));
                 }
                 return;
+            }
+
+            // Enter key
+            if (data === '\r') {
+                if (currentInput.trim() !== '') {
+                    history.push(currentInput);
+                    historyIndex = history.length;
+                }
+                currentInput = '';
+            }
+            // Up arrow
+            else if (data === '\x1b[A') {
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    term.write('\x1b[2K\r' + history[historyIndex]);
+                    currentInput = history[historyIndex];
+                }
+            }
+            // Down arrow
+            else if (data === '\x1b[B') {
+                if (historyIndex < history.length - 1) {
+                    historyIndex++;
+                    term.write('\x1b[2K\r' + history[historyIndex]);
+                    currentInput = history[historyIndex];
+                } else if (historyIndex === history.length - 1) {
+                    historyIndex++;
+                    term.write('\x1b[2K\r');
+                    currentInput = '';
+                }
+            }
+            // Backspace
+            else if (data === '\x7f') {
+                if (currentInput.length > 0) {
+                    currentInput = currentInput.slice(0, -1);
+                    term.write('\x1b[D \x1b[D');
+                }
+            }
+            else {
+                currentInput += data;
             }
 
             try {
@@ -310,9 +352,11 @@ export default function Radare2Terminal() {
             setDownloadProgress(30);
 
             let response: Response;
-            const wasmUrl = import.meta.env.MODE === "production"
-                ? `https://${import.meta.env.VITE_VERCEL_PROJECT_PRODUCTION_URL}/api/vercel?version=${version}`
-                : `http://localhost:3000/wasm/${version}`;
+            const wasmUrl = version === "6.0.3"
+                ? "https://radareorg.github.io/r2wasm/radare2.wasm"
+                : import.meta.env.MODE === "production"
+                    ? `https://${import.meta.env.VITE_VERCEL_PROJECT_PRODUCTION_URL}/api/vercel?version=${version}`
+                    : `http://localhost:3000/wasm/${version}`;
             try {
                 response = await fetch(wasmUrl);
             } catch (e) {
