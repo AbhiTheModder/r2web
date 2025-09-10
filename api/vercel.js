@@ -1,5 +1,5 @@
-const axios = require('axios');
-const unzipper = require('unzipper');
+import axios from 'axios';
+import unzipper from 'unzipper';
 
 export default async function handler(req, res) {
     const { version } = req.query;
@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
-    
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         });
 
         res.setHeader('Content-Type', 'application/wasm');
-        
+
         response.data
             .pipe(unzipper.ParseOne(/radare2\.wasm$/))
             .pipe(res)
