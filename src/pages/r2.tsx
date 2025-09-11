@@ -61,7 +61,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
         setDir(mydir);
 
         const newInstance = await pkg.entrypoint!.run({
-            args: [file.name],
+            args: ["e", "io.cache=1", file.name],
             mount: {
                 ["./"]: {
                     [file.name]: file.data,
@@ -192,6 +192,10 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                 if (currentInput.trim() !== '') {
                     history.push(currentInput);
                     historyIndex = history.length;
+                    const prompt = term.buffer.active.getLine(term.buffer.active.cursorY)!.translateToString();
+                    console.log('Prompt:', prompt);
+                    const constantPart = prompt.match(/\[0x.*\]/)?.[0];
+                    term.write('\x1b[2K\r\x1b[33m' + constantPart + '>  \x1b[0m\x1b[32m');
                     term.write('\x1b[2K\r\x1b[33m]>  \x1b[0m\x1b[32m');
                 }
                 stdin?.write(encoder.encode(currentInput));
@@ -295,7 +299,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
             setDir(mydir);
 
             const newInstance = await pkg.entrypoint!.run({
-                args: [file.name],
+                args: ["e", "io.cache=1", file.name],
                 mount: {
                     ["./"]: { [file.name]: file.data },
                     mydir,
@@ -356,6 +360,7 @@ export default function Radare2Terminal() {
     >("initializing");
     const [cachedVersions, setCachedVersions] = useState<string[]>([]);
     const [showCachedVersions, setShowCachedVersions] = useState(false);
+    const [currentVersion, setCurrentVersion] = useState<string>("");
 
     // Tabs state
     const [tabs, setTabs] = useState<number[]>([0]);
@@ -374,6 +379,7 @@ export default function Radare2Terminal() {
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const version = urlParams.get("version") || "6.0.3";
+        setCurrentVersion(version);
         const doCache = urlParams.get("cache") === "true";
         async function initializeWasmer() {
             const { Wasmer, init } = await import("@wasmer/sdk");
@@ -1083,6 +1089,54 @@ export default function Radare2Terminal() {
                                             )}
                                         </li>
                                     )}
+                                    {currentVersion >= "6.0.3" && (<li>
+                                        <button
+                                            onClick={async () => {
+                                                if (!isFileSelected) return;
+                                                const writer = getActiveWriter();
+                                                const encoder = new TextEncoder();
+                                                if (writer) {
+                                                    writer?.write(encoder.encode('?e "\\ec"'));
+                                                    writer?.write(encoder.encode("\r"));
+                                                    writer?.write(encoder.encode(`wcf mydir/${file.name.split(".").slice(0, -1).join(".")}_m.${file.name.split(".").pop()}`));
+                                                    writer?.write(encoder.encode("\r"));
+                                                    writer?.write(encoder.encode('?e "\\ec"'));
+                                                    writer?.write(encoder.encode("[*] Saving file..."));
+                                                    // saving takes a lil bit of time so we wait for it to finish
+                                                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                                                    const ref = tabRefs.current[activeTab]?.current;
+                                                    const dir = ref?.getDir();
+
+                                                    if (dir) {
+                                                        // const entries = await dir.readDir(".");
+                                                        // console.log(entries);
+                                                        const bytes = await dir.readFile(`/${file.name.split(".").slice(0, -1).join(".")}_m.${file.name.split(".").pop()}`);
+                                                        console.log(bytes);
+                                                        const blob = new Blob([bytes], { type: "application/octet-stream" });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement("a");
+                                                        a.href = url;
+                                                        a.download = `${file.name.split(".").slice(0, -1).join(".")}_m.${file.name.split(".").pop()}`;
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                        writer?.write(encoder.encode('?e "\\ec"'));
+                                                        writer?.write(encoder.encode("[*] File saved successfully!"));
+                                                    }
+                                                }
+                                            }}
+                                            disabled={!isFileSelected}
+                                            style={{
+                                                padding: "5px 5px 5px 5px",
+                                                backgroundColor: "#2d2d2d",
+                                                color: "#ffffff",
+                                                marginTop: "10px",
+                                                width: "100%",
+                                                textAlign: "center",
+                                            }}
+                                        >
+                                            Save File
+                                        </button>
+                                    </li>)}
                                 </ul>
                                 <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
                                     <button
