@@ -1105,6 +1105,7 @@ export default function Radare2Terminal() {
                                                     writer?.write(encoder.encode(`wcf mydir/${file.name.split(".").slice(0, -1).join(".")}_m.${file.name.split(".").pop()}`));
                                                     writer?.write(encoder.encode("\r"));
                                                     writer?.write(encoder.encode('?e "\\ec"'));
+                                                    writer?.write(encoder.encode("\r"));
                                                     writer?.write(encoder.encode("[*] Saving file..."));
                                                     // saving takes a lil bit of time so we wait for it to finish
                                                     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1124,6 +1125,7 @@ export default function Radare2Terminal() {
                                                         a.click();
                                                         URL.revokeObjectURL(url);
                                                         writer?.write(encoder.encode('?e "\\ec"'));
+                                                        writer?.write(encoder.encode("\r"));
                                                         writer?.write(encoder.encode("[*] File saved successfully!"));
                                                     }
                                                 }
