@@ -50,6 +50,11 @@ bun run api/wasm.js # or node api/wasm.js if you don't have bun installed
 ```
 which will run a local proxy server at `http://localhost:3000/wasm`, that will be used to fetch the wasm file from the github releases.
 
+Or you can run both dev & proxy server at the same time using:
+```shell
+bun cc
+```
+
 Or skip the setup and [try it live](https://r2.revengi.in).
 
 > [!TIP]
@@ -59,7 +64,6 @@ Or skip the setup and [try it live](https://r2.revengi.in).
 
 - This is a work in progress. Expect bugs and missing features.
 - The radare2 binary is downloaded on first load and cached for future use (an option to disable caching is also given).
-- No history support.
 - ~~Currently there's no way to save modified files, (seems like an issue on r2wasm side), figuring out a way to fix it.~~ (Fixed on r2 versions 6.0.3 onwards...)
 
 
