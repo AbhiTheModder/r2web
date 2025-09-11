@@ -61,7 +61,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
         setDir(mydir);
 
         const newInstance = await pkg.entrypoint!.run({
-            args: ["e", "io.cache=1", file.name],
+            args: ["-e", "io.cache=1", file.name],
             mount: {
                 ["./"]: {
                     [file.name]: file.data,
@@ -194,9 +194,13 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                     historyIndex = history.length;
                     const prompt = term.buffer.active.getLine(term.buffer.active.cursorY)!.translateToString();
                     console.log('Prompt:', prompt);
-                    const constantPart = prompt.match(/\[0x.*\]/)?.[0];
-                    term.write('\x1b[2K\r\x1b[33m' + constantPart + '>  \x1b[0m\x1b[32m');
-                    term.write('\x1b[2K\r\x1b[33m]>  \x1b[0m\x1b[32m');
+                    const cprompt = prompt.match(/\[0x.*\]/)?.[0];
+                    if (cprompt) {
+                        term.write('\x1b[2K\r' + cprompt + ' ');
+                    } else {
+                        term.write('\x1b[2K\r]> ');
+                    }
+
                 }
                 stdin?.write(encoder.encode(currentInput));
                 stdin?.write(encoder.encode('\r'));
@@ -235,6 +239,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
             }
             else {
                 currentInput += data;
+                term.write(data);
             }
 
             try {
@@ -244,7 +249,6 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
                 }
 
                 cancelController = new AbortController();
-                stdin?.write(encoder.encode(data));
             } catch (error) {
                 console.error("Error writing to stdin:", error);
                 term.write("\r\nError: Failed to write to stdin\r\n");
@@ -299,7 +303,7 @@ const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) =
             setDir(mydir);
 
             const newInstance = await pkg.entrypoint!.run({
-                args: ["e", "io.cache=1", file.name],
+                args: ["-e", "io.cache=1", file.name],
                 mount: {
                     ["./"]: { [file.name]: file.data },
                     mydir,
