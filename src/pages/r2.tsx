@@ -1106,7 +1106,8 @@ export default function Radare2Terminal() {
                                                     writer?.write(encoder.encode("\r"));
                                                     writer?.write(encoder.encode('?e "\\ec"'));
                                                     writer?.write(encoder.encode("\r"));
-                                                    writer?.write(encoder.encode("[*] Saving file..."));
+                                                    writer?.write(encoder.encode("?e [I] Saving file..."));
+                                                    writer?.write(encoder.encode("\r"));
                                                     // saving takes a lil bit of time so we wait for it to finish
                                                     await new Promise((resolve) => setTimeout(resolve, 1000));
                                                     const ref = tabRefs.current[activeTab]?.current;
@@ -1126,7 +1127,8 @@ export default function Radare2Terminal() {
                                                         URL.revokeObjectURL(url);
                                                         writer?.write(encoder.encode('?e "\\ec"'));
                                                         writer?.write(encoder.encode("\r"));
-                                                        writer?.write(encoder.encode("[*] File saved successfully!"));
+                                                        writer?.write(encoder.encode("?e [S] File saved successfully!"));
+                                                        writer?.write(encoder.encode("\r"));
                                                     }
                                                 }
                                             }}
