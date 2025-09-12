@@ -59,7 +59,7 @@ export const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active },
         setDir(mydir);
 
         const newInstance = await pkg.entrypoint!.run({
-            args: ["-e", "io.cache=1", "-e", "anal.depth=26", file.name],
+            args: ["-e", "io.cache=1", "-e", "anal.depth=24", file.name],
             mount: {
                 ["./"]: {
                     [file.name]: file.data,
@@ -302,7 +302,7 @@ export const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active },
             setDir(mydir);
 
             const newInstance = await pkg.entrypoint!.run({
-                args: ["-e", "io.cache=1", "-e", "anal.depth=26", file.name],
+                args: ["-e", "io.cache=1", "-e", "anal.depth=24", file.name],
                 mount: {
                     ["./"]: { [file.name]: file.data },
                     mydir,
