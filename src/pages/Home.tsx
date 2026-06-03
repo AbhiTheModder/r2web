@@ -25,7 +25,7 @@ export default function Home() {
     const [file, setFile] = useState<File | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [selectedVersion, setSelectedVersion] = useState("6.1.2");
+    const [selectedVersion, setSelectedVersion] = useState("6.1.6");
     const [cacheVersion, setCacheVersion] = useState(false);
     const [loadingVersions, setLoadingVersions] = useState(true);
     const navigate = useNavigate();
@@ -42,7 +42,7 @@ export default function Home() {
     };
 
     const [r2Versions, setR2Versions] = useState([
-        { value: "6.1.2", label: "r2 6.1.2" },
+        { value: "6.1.6", label: "r2 6.1.6" },
     ]);
 
     useEffect(() => {
@@ -56,7 +56,7 @@ export default function Home() {
                         value: release.tag_name,
                         label: `r2 ${release.tag_name}`,
                     }))
-                    .filter((version: { value: string; }) => version.value !== "6.1.2" && /^\d+\.\d+\.\d+$/.test(version.value))
+                    .filter((version: { value: string; }) => version.value !== "6.1.6" && /^\d+\.\d+\.\d+$/.test(version.value))
                     .sort((a: { value: string; }, b: { value: string; }) => {
                         const va = a.value.split('.').map(Number);
                         const vb = b.value.split('.').map(Number);
