@@ -5,6 +5,7 @@ type FileData = {
 
 class FileStore {
     private file: FileData | null = null;
+    private projectFile: FileData | null = null;
 
     setFile(file: FileData) {
         this.file = file;
@@ -14,8 +15,17 @@ class FileStore {
         return this.file;
     }
 
+    setProjectFile(pf: FileData | null) {
+        this.projectFile = pf;
+    }
+
+    getProjectFile(): FileData | null {
+        return this.projectFile;
+    }
+
     clear() {
         this.file = null;
+        this.projectFile = null;
     }
 }
 

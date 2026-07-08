@@ -1721,6 +1721,7 @@ export default function Radare2Terminal() {
                                             ref={tabRefs.current[id]}
                                             pkg={pkg}
                                             file={fileStore.getFile()}
+                                            projectFile={id === tabs[0] ? fileStore.getProjectFile() : null}
                                             active={id === activeTab}
                                         />
                                     );

@@ -22,9 +22,10 @@ type R2TabHandle = {
 type R2TabProps = {
     pkg: Wasmer | null;
     file: { name: string; data: Uint8Array } | null;
+    projectFile?: { name: string; data: Uint8Array } | null;
     active: boolean;
 };
-export const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active }, ref) => {
+export const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, projectFile, active }, ref) => {
     const terminalRef = useRef<HTMLDivElement>(null);
     const [termInstance, setTermInstance] = useState<Terminal | null>(null);
     const [fitAddon, setFitAddon] = useState<FitAddon | null>(null);
@@ -333,6 +334,21 @@ export const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active },
             });
             setInstance(newInstance);
             connectStreams(newInstance, termInstance);
+
+            if (projectFile) {
+                await mydir.writeFile(`/${projectFile.name}`, projectFile.data);
+                const writer = newInstance.stdin?.getWriter();
+                if (writer) {
+                    const enc = new TextEncoder();
+                    writer.write(enc.encode("\r"));
+                    writer.write(enc.encode(`Pzi mydir/${projectFile.name}`));
+                    writer.write(enc.encode("\r"));
+                    writer.releaseLock();
+                }
+                setTimeout(async () => {
+                    try { await mydir.removeFile(`/${projectFile.name}`); } catch (_e) {}
+                }, 3000);
+            }
         })();
 
         return () => {
@@ -345,7 +361,7 @@ export const R2Tab = forwardRef<R2TabHandle, R2TabProps>(({ pkg, file, active },
                 instance?.free();
             } catch (_) { }
         };
-    }, [pkg, termInstance, file]);
+    }, [pkg, termInstance, file, projectFile]);
 
     useEffect(() => {
         if (active) {

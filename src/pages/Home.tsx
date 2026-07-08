@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { fileStore } from "../store/FileStore";
+import { projectStore, type ProjectMeta } from "../store/ProjectStore";
 import { useNavigate } from "react-router-dom";
 
 const UploadIcon = ({ style }: { style?: React.CSSProperties }) => (
@@ -21,6 +22,22 @@ const UploadIcon = ({ style }: { style?: React.CSSProperties }) => (
     </svg>
 );
 
+const ProjectIcon = ({ style }: { style?: React.CSSProperties }) => (
+    <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+    >
+        <path
+            d="M20 6H12L10 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6ZM20 18H4V8H20V18Z"
+            fill="currentColor"
+        />
+    </svg>
+);
+
 export default function Home() {
     const [file, setFile] = useState<File | null>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -31,13 +48,98 @@ export default function Home() {
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [projectFile, setProjectFile] = useState<File | null>(null);
+    const [isDraggingProject, setIsDraggingProject] = useState(false);
+    const projectInputRef = useRef<HTMLInputElement>(null);
+    const [cachedProjects, setCachedProjects] = useState<ProjectMeta[]>([]);
+    const [selectedCachedProject, setSelectedCachedProject] = useState<string | null>(null);
+    const [loadingProject, setLoadingProject] = useState(false);
+
     useEffect(() => {
         fileStore.clear();
+        loadCachedProjects();
     }, []);
+
+    const loadCachedProjects = async () => {
+        try {
+            const projects = await projectStore.list();
+            setCachedProjects(projects);
+        } catch (_e) {
+            // IndexedDB may not be available
+        }
+    };
 
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.length) {
             setFile(e.target.files[0]);
+        }
+    };
+
+    const onProjectFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.length) {
+            const pf = e.target.files[0];
+            if (!pf.name.endsWith(".zrp")) return;
+            setProjectFile(pf);
+            setSelectedCachedProject(null);
+            try {
+                const data = new Uint8Array(await pf.arrayBuffer());
+                await projectStore.save(pf.name, data);
+                await loadCachedProjects();
+            } catch (_e) {
+                // storage error, non-critical
+            }
+        }
+    };
+
+    const onProjectDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDraggingProject(false);
+        const droppedFile = e.dataTransfer.files[0];
+        if (droppedFile && droppedFile.name.endsWith(".zrp")) {
+            setProjectFile(droppedFile);
+            setSelectedCachedProject(null);
+            try {
+                const data = new Uint8Array(await droppedFile.arrayBuffer());
+                await projectStore.save(droppedFile.name, data);
+                await loadCachedProjects();
+            } catch (_e) {
+                // storage error, non-critical
+            }
+        }
+    };
+
+    const onProjectDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDraggingProject(true);
+    };
+
+    const onProjectDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setIsDraggingProject(false);
+        }
+    };
+
+    const selectCachedProject = async (name: string) => {
+        setLoadingProject(true);
+        try {
+            const data = await projectStore.load(name);
+            if (data) {
+                setProjectFile(new File([data], name));
+                setSelectedCachedProject(name);
+            }
+        } catch (_e) {
+            // load error
+        } finally {
+            setLoadingProject(false);
+        }
+    };
+
+    const deleteCachedProject = async (name: string) => {
+        await projectStore.delete(name);
+        await loadCachedProjects();
+        if (selectedCachedProject === name) {
+            setSelectedCachedProject(null);
+            setProjectFile(null);
         }
     };
 
@@ -106,6 +208,17 @@ export default function Home() {
                 name: file.name,
                 data: new Uint8Array(arrayBuffer),
             });
+
+            if (projectFile) {
+                const projectArrayBuffer = await projectFile.arrayBuffer();
+                fileStore.setProjectFile({
+                    name: projectFile.name,
+                    data: new Uint8Array(projectArrayBuffer),
+                });
+            } else {
+                fileStore.setProjectFile(null);
+            }
+
             navigate(`/r2?version=${selectedVersion}&cache=${cacheVersion}`);
         } catch (error) {
             console.error("Error processing file:", error);
@@ -120,6 +233,11 @@ export default function Home() {
         const sizes = ["Bytes", "KB", "MB", "GB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    };
+
+    const formatDate = (timestamp: number) => {
+        const d = new Date(timestamp);
+        return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
     };
 
     return (
@@ -203,7 +321,7 @@ export default function Home() {
                         >
                             <UploadIcon style={{ color: isDragging ? '#00aa00' : '#666' }} />
                             <p style={styles.dropZoneText}>
-                                Drag & drop your file here
+                                Drag & drop your binary here
                             </p>
                             <p style={styles.orText}>or</p>
                             <p style={styles.browseLabel}>
@@ -226,6 +344,123 @@ export default function Home() {
                                 <div style={styles.fileSize}>
                                     Size: {formatFileSize(file.size)}
                                 </div>
+                            </div>
+                        )}
+
+                        {file && (
+                            <div style={styles.projectSection}>
+                                <div style={styles.projectHeader}>
+                                    <ProjectIcon style={{ width: "18px", height: "18px", color: "#aaa" }} />
+                                    <span style={styles.projectTitle}>Import project (optional)</span>
+                                </div>
+                                <p style={styles.projectHint}>
+                                    Load a .zrp project file to restore analysis, comments, and metadata.
+                                </p>
+                                <div
+                                    onClick={() => projectInputRef.current?.click()}
+                                    onDragOver={onProjectDragOver}
+                                    onDragLeave={onProjectDragLeave}
+                                    onDrop={onProjectDrop}
+                                    onMouseEnter={(e) => {
+                                        if (!isDraggingProject) {
+                                            e.currentTarget.style.borderColor = '#555';
+                                            e.currentTarget.style.background = '#1a1a1a';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isDraggingProject) {
+                                            e.currentTarget.style.borderColor = '#333';
+                                            e.currentTarget.style.background = '#111';
+                                        }
+                                    }}
+                                    style={{
+                                        ...styles.projectDropZone,
+                                        border: `1px dashed ${isDraggingProject ? '#00aa00' : '#333'}`,
+                                        background: isDraggingProject ? '#001100' : '#111',
+                                    }}
+                                >
+                                    <span style={{ color: "#aaa", fontSize: "0.85rem" }}>Drop .zrp here or browse</span>
+                                    <input
+                                        ref={projectInputRef}
+                                        type="file"
+                                        accept=".zrp"
+                                        onChange={onProjectFileChange}
+                                        style={styles.hiddenInput}
+                                    />
+                                </div>
+
+                                {projectFile && (
+                                    <div style={styles.selectedProjectInfo}>
+                                        <span style={{ color: "#00aa00", fontSize: "0.85rem", wordBreak: "break-all" }}>
+                                            {projectFile.name}
+                                        </span>
+                                        <span style={{ color: "#888", fontSize: "0.8rem", marginLeft: "8px" }}>
+                                            {formatFileSize(projectFile.size)}
+                                        </span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setProjectFile(null);
+                                                setSelectedCachedProject(null);
+                                            }}
+                                            style={{
+                                                marginLeft: "auto",
+                                                background: "none",
+                                                border: "none",
+                                                color: "#aa3333",
+                                                cursor: "pointer",
+                                                fontSize: "0.85rem",
+                                                padding: "0 4px",
+                                            }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                )}
+
+                                {cachedProjects.length > 0 && (
+                                    <div style={styles.cachedProjectsContainer}>
+                                        <div style={styles.cachedProjectsHeader}>Saved projects</div>
+                                        {cachedProjects.map((p) => (
+                                            <div
+                                                key={p.name}
+                                                onClick={() => !loadingProject && selectCachedProject(p.name)}
+                                                style={{
+                                                    ...styles.cachedProjectItem,
+                                                    background: selectedCachedProject === p.name ? "#002200" : "#151515",
+                                                    borderColor: selectedCachedProject === p.name ? "#00aa00" : "#2a2a2a",
+                                                    cursor: loadingProject ? "wait" : "pointer",
+                                                }}
+                                            >
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ color: "#ccc", fontSize: "0.85rem", wordBreak: "break-all" }}>
+                                                        {p.name}
+                                                    </div>
+                                                    <div style={{ color: "#666", fontSize: "0.75rem" }}>
+                                                        {formatFileSize(p.size)} · {formatDate(p.savedAt)}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteCachedProject(p.name);
+                                                    }}
+                                                    style={{
+                                                        background: "none",
+                                                        border: "none",
+                                                        color: "#aa3333",
+                                                        cursor: "pointer",
+                                                        fontSize: "0.8rem",
+                                                        padding: "2px 6px",
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -404,6 +639,64 @@ const styles = {
         color: "#aaa",
         fontSize: "0.85rem",
         marginTop: "0.25rem",
+    },
+    projectSection: {
+        width: "100%",
+        marginBottom: "1.5rem",
+    },
+    projectHeader: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        marginBottom: "6px",
+    },
+    projectTitle: {
+        color: "#ccc",
+        fontSize: "0.95rem",
+        fontWeight: "500" as const,
+    },
+    projectHint: {
+        color: "#777",
+        fontSize: "0.8rem",
+        marginBottom: "10px",
+        lineHeight: "1.3",
+    },
+    projectDropZone: {
+        borderRadius: "0",
+        padding: "12px",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        cursor: "pointer",
+        transition: "border-color 0.3s ease, background 0.3s ease",
+        minHeight: "40px",
+        boxSizing: "border-box" as const,
+    },
+    selectedProjectInfo: {
+        display: "flex",
+        alignItems: "center",
+        background: "#001100",
+        border: "1px solid #004400",
+        padding: "8px 12px",
+        marginTop: "8px",
+    },
+    cachedProjectsContainer: {
+        marginTop: "10px",
+    },
+    cachedProjectsHeader: {
+        color: "#888",
+        fontSize: "0.8rem",
+        marginBottom: "6px",
+        textTransform: "uppercase" as const,
+        letterSpacing: "0.5px",
+    },
+    cachedProjectItem: {
+        display: "flex",
+        alignItems: "center",
+        padding: "8px 10px",
+        border: "1px solid #2a2a2a",
+        marginBottom: "4px",
+        transition: "background 0.2s ease",
     },
     button: {
         color: "#e0e0e0",
