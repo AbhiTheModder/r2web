@@ -47,30 +47,30 @@ To run locally:
 ```shell
 git clone https://github.com/radareorg/r2web.git
 cd r2web
-aube install
-aube dev
+bun install
+bun dev
 ```
 
 you'll need to run a very small proxy api server to workaround with browser's CORS policy, to do that run:
 ```shell
-aube run api/wasm.cjs # or node api/wasm.cjs if you don't have aube installed
+bun run api/wasm.cjs # or node api/wasm.cjs if you don't have bun installed
 ```
 which will run a local proxy server at `http://localhost:3000/wasm`, that will be used to fetch the wasm file from the github releases.
 
 Or you can run both dev & proxy server at the same time using:
 ```shell
-aube cc
+bun cc
 ```
 
 To build for production:
 ```shell
-aube run build
+bun run build
 ```
 
 By default, the build assumes your app is served from the root path (`/`). If deploying to a subdirectory (e.g., `example.com/online`), set the `VITE_BASE_URL` environment variable:
 
 ```shell
-VITE_BASE_URL=/online aube run build
+VITE_BASE_URL=/online bun run build
 ```
 
 > [!NOTE]
@@ -79,8 +79,8 @@ VITE_BASE_URL=/online aube run build
 Or skip the setup and [try it live](https://r2.revengi.in).
 
 > [!TIP]
-> 1. If you don't have aube installed, you can use npm or yarn or any other package manager which you have installed. Just replace `aube` with `npm` or `yarn` (or any other package manager) in the above commands.
-> 
+> 1. If you don't have bun installed, you can use npm or yarn or any other package manager which you have installed. Just replace `bun` with `npm` or `yarn` (or any other package manager) in the above commands.
+>
 > 2. When opening the built files directly from your file system (using `file://` protocol), you may encounter CORS errors. Static hosting with a proper HTTP server (like GitHub Pages, Netlify, Vercel, etc.) is recommended or start a local server.
 
 ## FAQ

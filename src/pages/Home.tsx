@@ -28,8 +28,10 @@ export default function Home() {
     const [selectedVersion, setSelectedVersion] = useState("6.1.8");
     const [cacheVersion, setCacheVersion] = useState(false);
     const [loadingVersions, setLoadingVersions] = useState(true);
+    const [customWasmFile, setCustomWasmFile] = useState<File | null>(null);
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const wasmInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         fileStore.clear();
@@ -40,6 +42,14 @@ export default function Home() {
             setFile(e.target.files[0]);
         }
     };
+
+    const onWasmFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.length) {
+            setCustomWasmFile(e.target.files[0]);
+        }
+    };
+
+    const isCustom = selectedVersion === "custom";
 
     const [r2Versions, setR2Versions] = useState([
         { value: "6.1.8", label: "r2 6.1.8" },
@@ -66,7 +76,7 @@ export default function Home() {
                         return 0;
                     })
                     .slice(0, 21);
-                setR2Versions(prevVersions => [prevVersions[0], ...versions]);
+                setR2Versions(prevVersions => [prevVersions[0], ...versions, { value: "custom", label: "Custom WASM build..." }]);
             } catch (error) {
                 console.error('Error fetching r2 versions:', error);
             } finally {
@@ -106,6 +116,10 @@ export default function Home() {
                 name: file.name,
                 data: new Uint8Array(arrayBuffer),
             });
+            if (isCustom && customWasmFile) {
+                const wasmBuffer = await customWasmFile.arrayBuffer();
+                fileStore.setCustomWasm(new Uint8Array(wasmBuffer));
+            }
             navigate(`/r2?version=${selectedVersion}&cache=${cacheVersion}`);
         } catch (error) {
             console.error("Error processing file:", error);
@@ -166,16 +180,47 @@ export default function Home() {
                                     ))
                                 )}
                             </select>
-                            <label style={styles.cacheLabel}>
-                                <input
-                                    type="checkbox"
-                                    checked={cacheVersion}
-                                    onChange={() => setCacheVersion(!cacheVersion)}
-                                    style={styles.cacheCheckbox}
-                                />
-                                Cache this version
-                            </label>
+                            {!isCustom && (
+                                <label style={styles.cacheLabel}>
+                                    <input
+                                        type="checkbox"
+                                        checked={cacheVersion}
+                                        onChange={() => setCacheVersion(!cacheVersion)}
+                                        style={styles.cacheCheckbox}
+                                    />
+                                    Cache this version
+                                </label>
+                            )}
                         </div>
+
+                        {isCustom && (
+                            <div
+                                onClick={() => wasmInputRef.current?.click()}
+                                style={{
+                                    ...styles.dropZone,
+                                    border: '1px dashed #444',
+                                    background: customWasmFile ? '#001100' : 'transparent',
+                                    cursor: 'pointer',
+                                    minHeight: '100px',
+                                    padding: '1rem',
+                                    marginBottom: '0.75rem',
+                                }}
+                            >
+                                <p style={{ ...styles.dropZoneText, fontSize: '0.85rem' }}>
+                                    {customWasmFile ? customWasmFile.name : 'Upload custom radare2.wasm'}
+                                </p>
+                                <p style={{ ...styles.orText, fontSize: '0.75rem' }}>
+                                    {customWasmFile ? `${(customWasmFile.size / 1024 / 1024).toFixed(1)} MB` : 'or click to browse'}
+                                </p>
+                                <input
+                                    ref={wasmInputRef}
+                                    type="file"
+                                    accept=".wasm"
+                                    onChange={onWasmFileChange}
+                                    style={styles.hiddenInput}
+                                />
+                            </div>
+                        )}
 
                         <div
                             onClick={() => fileInputRef.current?.click()}
@@ -230,23 +275,23 @@ export default function Home() {
                         )}
 
                         <button
-                            disabled={!file || isUploading}
+                            disabled={!file || isUploading || (isCustom && !customWasmFile)}
                             onClick={onOpenRadare2}
                             style={{
                                 ...styles.button,
-                                background: (!file || isUploading) ? '#333' : '#222',
-                                borderColor: (!file || isUploading) ? '#333' : '#444',
-                                cursor: (!file || isUploading) ? "not-allowed" : "pointer",
-                                color: (!file || isUploading) ? '#666' : '#e0e0e0',
+                                background: (!file || isUploading || (isCustom && !customWasmFile)) ? '#333' : '#222',
+                                borderColor: (!file || isUploading || (isCustom && !customWasmFile)) ? '#333' : '#444',
+                                cursor: (!file || isUploading || (isCustom && !customWasmFile)) ? "not-allowed" : "pointer",
+                                color: (!file || isUploading || (isCustom && !customWasmFile)) ? '#666' : '#e0e0e0',
                             }}
                             onMouseEnter={(e) => {
-                                if (file && !isUploading) {
+                                if (file && !isUploading && !(isCustom && !customWasmFile)) {
                                     e.currentTarget.style.background = '#333';
                                     e.currentTarget.style.borderColor = '#555';
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (file && !isUploading) {
+                                if (file && !isUploading && !(isCustom && !customWasmFile)) {
                                     e.currentTarget.style.background = '#222';
                                     e.currentTarget.style.borderColor = '#444';
                                 }

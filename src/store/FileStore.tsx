@@ -5,6 +5,7 @@ type FileData = {
 
 class FileStore {
     private file: FileData | null = null;
+    private customWasm: Uint8Array | null = null;
 
     setFile(file: FileData) {
         this.file = file;
@@ -14,8 +15,17 @@ class FileStore {
         return this.file;
     }
 
+    setCustomWasm(wasm: Uint8Array) {
+        this.customWasm = wasm;
+    }
+
+    getCustomWasm(): Uint8Array | null {
+        return this.customWasm;
+    }
+
     clear() {
         this.file = null;
+        this.customWasm = null;
     }
 }
 

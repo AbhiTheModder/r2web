@@ -87,6 +87,15 @@ export default function Radare2Terminal() {
             const { Wasmer, init } = await import("@wasmer/sdk");
             await init({ module: wasmerSDKModule });
 
+            if (version === "custom") {
+                const customWasm = fileStore.getCustomWasm();
+                if (customWasm) {
+                    const packageInstance = Wasmer.fromWasm(customWasm);
+                    setPkg(packageInstance);
+                    return;
+                }
+            }
+
             const cache = await caches.open("wasm-cache");
             const cachedResponse = await cache.match(version);
             if (cachedResponse) {
@@ -551,6 +560,29 @@ export default function Radare2Terminal() {
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, [tabs, activeTab, showHexView, showStringsView, showGraphView, showShortcuts]);
+
+    useEffect(() => {
+        if (!pkg || currentVersion !== "custom") return;
+        const timer = setTimeout(async () => {
+            const ref = tabRefs.current[0]?.current;
+            const writer = ref?.getWriter();
+            const dir = ref?.getDir();
+            if (writer && dir) {
+                const encoder = new TextEncoder();
+                writer.write(encoder.encode("?V > mydir/.r2version"));
+                writer.write(encoder.encode("\r"));
+                await new Promise(r => setTimeout(r, 500));
+                try {
+                    const bytes = await dir.readFile("/.r2version");
+                    const ver = new TextDecoder().decode(bytes).trim();
+                    const semverMatch = ver.match(/\d+\.\d+\.\d+/);
+                    setCurrentVersion(semverMatch ? semverMatch[0] : ver);
+                    await dir.removeFile("/.r2version");
+                } catch {}
+            }
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [pkg]);
 
     useEffect(() => {
         const checkMobile = () => {
@@ -1074,7 +1106,9 @@ export default function Radare2Terminal() {
                                             }}
                                         />
                                     </button>
-                                    <h3>r2web</h3>
+                                    <h3 style={{ fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
+                                        {currentVersion ? `r2 ${currentVersion}` : 'r2web'}
+                                    </h3>
                                     <button
                                         className="icon-btn"
                                         onClick={() => setSidebarOpen(false)}

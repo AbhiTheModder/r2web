@@ -19,21 +19,21 @@ Key architectural facts:
 
 ## Essential Commands
 
-Use `aube` as the primary package manager (npm/yarn also work as drop-in replacements). All scripts are defined in `package.json`.
+Use `bun` as the primary package manager (npm/yarn also work as drop-in replacements). All scripts are defined in `package.json`.
 
 | Command | Purpose |
 |---------|---------|
-| `aube install` | Install dependencies. Also runs `postinstall`, which copies `coi-serviceworker.min.js` into `public/`. |
-| `aube dev` | Start the Vite dev server. Serves the app with COOP/COEP headers and proxies `/wasm/*` to `http://localhost:3000`. |
-| `aube cc` | Run **both** the Vite dev server and the local WASM proxy server (`api/wasm.cjs`) concurrently. This is the recommended local dev command. |
-| `aube run build` | Type-check (`tsc -b`) and build for production. Output goes to `dist/`. |
-| `aube run lint` | Run ESLint over the whole project. |
-| `aube run preview` | Preview the production build locally. |
-| `node api/wasm.cjs` | Start the local proxy server manually on port 3000. Useful if you don't have `aube`. |
+| `bun install` | Install dependencies. Also runs `postinstall`, which copies `coi-serviceworker.min.js` into `public/`. |
+| `bun dev` | Start the Vite dev server. Serves the app with COOP/COEP headers and proxies `/wasm/*` to `http://localhost:3000`. |
+| `bun cc` | Run **both** the Vite dev server and the local WASM proxy server (`api/wasm.cjs`) concurrently. This is the recommended local dev command. |
+| `bun run build` | Type-check (`tsc -b`) and build for production. Output goes to `dist/`. |
+| `bun run lint` | Run ESLint over the whole project. |
+| `bun run preview` | Preview the production build locally. |
+| `node api/wasm.cjs` | Start the local proxy server manually on port 3000. Useful if you don't have `bun`. |
 
 ### Environment variables for build/deploy
 
-- `VITE_BASE_URL` — base path for production builds. Default is `/`. Example: `VITE_BASE_URL=/online aube run build`.
+- `VITE_BASE_URL` — base path for production builds. Default is `/`. Example: `VITE_BASE_URL=/online bun run build`.
 - `VITE_VERCEL_PROJECT_PRODUCTION_URL` / `VITE_VERCEL_URL` — used at runtime in production to route WASM downloads through the Vercel API (`api/vercel.js`).
 - `VITE_WASM_SERVER` — optional override for the WASM proxy base URL in development.
 
@@ -164,7 +164,7 @@ This pattern is used throughout the auxiliary views (Strings, Hexdump, Graph) to
 
 - Default version `6.1.8` is loaded from `https://radareorg.github.io/r2wasm/radare2.wasm` directly.
 - Other versions are fetched from GitHub releases as a ZIP. Browsers cannot fetch GitHub release ZIPs directly due to CORS, so a proxy is required.
-- `aube cc` runs both Vite and the proxy. The proxy is at `api/wasm.cjs` on port `3000`; Vite proxies `/wasm/:version` to it.
+- `bun cc` runs both Vite and the proxy. The proxy is at `api/wasm.cjs` on port `3000`; Vite proxies `/wasm/:version` to it.
 - In Vercel production, `api/vercel.js` serves the same role.
 
 ### `@wasmer/sdk` is excluded from dependency optimization
@@ -215,14 +215,14 @@ Writing back to the mounted binary depends on a fix in the r2 WASM build. Earlie
 
 ## Testing
 
-There is currently no test framework configured in this repository. The project relies on manual testing via `aube dev` / `aube cc` and the production build preview.
+There is currently no test framework configured in this repository. The project relies on manual testing via `bun dev` / `bun cc` and the production build preview.
 
 When adding features, verify:
 
-1. `aube run lint` passes.
-2. `aube run build` passes type-check and produces a `dist/` build.
-3. The feature works in the dev server with the proxy running (`aube cc`).
-4. The feature works in `aube run preview` (which more closely matches production headers and bundling).
+1. `bun run lint` passes.
+2. `bun run build` passes type-check and produces a `dist/` build.
+3. The feature works in the dev server with the proxy running (`bun cc`).
+4. The feature works in `bun run preview` (which more closely matches production headers and bundling).
 
 ---
 
@@ -257,6 +257,6 @@ From the project README and existing code:
 
 ## When in Doubt
 
-- Run `aube cc` for local development; it covers both the app and the proxy.
+- Run `bun cc` for local development; it covers both the app and the proxy.
 - Check `README.md` for user-facing setup and FAQ.
 - Keep the UI dependency-light and style inline unless there is a strong reason to diverge.
